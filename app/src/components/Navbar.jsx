@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext'
 import { useState } from 'react'
 
 const navigation = [
-  { name: 'Home', href: '/' },
   { name: 'Games', href: '/games', protected: true },
   { name: 'Teams', href: '/teams', protected: true },
   { name: 'Leaderboard', href: '/leaderboard' },
@@ -73,48 +72,59 @@ export default function Navbar() {
   )
 
   return (
-    <Disclosure as="nav" className="bg-gradient-to-r from-red-600 via-white to-blue-600 shadow-lg relative z-50" style={{ pointerEvents: 'auto' }}>
+    <Disclosure as="nav" className="bg-neutral-800 shadow-lg relative z-50" style={{ pointerEvents: 'auto' }}>
       {({ open }) => (
         <>
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex h-16 items-center justify-between">
+            <div className="flex h-16 items-center">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <Link 
                     to="/" 
-                    className="text-2xl font-bold text-slate-800 relative z-10"
+                    className="flex items-center space-x-3 relative z-10"
                     style={{ pointerEvents: 'auto' }}
                   >
-                    🃏 Poker League
+                    <img 
+                      src="/iplcardstransparent.png" 
+                      alt="IPL Logo" 
+                      className="h-14 w-14"
+                    />
+                    <span 
+                      className="text-4xl font-bold text-white"
+                      style={{ fontFamily: 'paladinsslaser, sans-serif' }}
+                    >
+                      IPL
+                    </span>
                   </Link>
-                </div>
-                <div className="hidden md:block">
-                  <div className="ml-10 flex items-baseline space-x-4">
-                    {visibleNavigation.map((item) => (
-                      <Link
-                        key={item.name}
-                        to={item.href}
-                        className={classNames(
-                          location.pathname === item.href
-                            ? 'bg-slate-800 text-white'
-                            : 'text-slate-800 hover:bg-slate-700 hover:text-white',
-                          'rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10'
-                        )}
-                        style={{ pointerEvents: 'auto' }}
-                      >
-                        {item.name}
-                      </Link>
-                    ))}
-                  </div>
                 </div>
               </div>
 
-              <div className="hidden md:block">
+              <div className="hidden md:flex flex-1 justify-center">
+                <div className="flex items-baseline space-x-4">
+                  {visibleNavigation.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className={classNames(
+                        location.pathname === item.href
+                          ? 'bg-[#ff3131] text-black'
+                          : 'text-white hover:bg-[#ff3131] hover:text-black',
+                        'rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10'
+                      )}
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      {item.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <div className="hidden md:flex">
                 <div className="ml-4 flex items-center md:ml-6 space-x-4">
                   {isAuthenticated && (
                     <>
                       {/* Coins Display */}
-                      <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">
+                      <div className="bg-gray-300 text-black px-3 py-1 rounded-full text-sm font-semibold">
                         💰 {user?.coins?.toLocaleString() || '0'} coins
                       </div>
                       
@@ -122,7 +132,7 @@ export default function Navbar() {
                       <button
                         onClick={handleGetCoins}
                         disabled={addingCoins}
-                        className="bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400 rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
+                        className="bg-[#ff3131] text-black hover:bg-red-600 disabled:bg-red-400 rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
                         style={{ pointerEvents: 'auto' }}
                       >
                         {addingCoins ? 'Adding...' : 'Get 10K Coins'}
@@ -134,19 +144,19 @@ export default function Navbar() {
                     /* Profile dropdown */
                     <Menu as="div" className="relative ml-3 z-50">
                       <div>
-                        <Menu.Button className="relative flex max-w-xs items-center rounded-full bg-slate-800 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-slate-800 z-10">
+                        <Menu.Button className="relative flex max-w-xs items-center rounded-full bg-[#ff3131] text-sm text-black focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-800 z-10">
                           <span className="absolute -inset-1.5" />
                           <span className="sr-only">Open user menu</span>
-                          <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                          <div className="h-8 w-8 rounded-full bg-[#ff3131] flex items-center justify-center text-black font-semibold">
                             {user?.first_name?.[0]}{user?.last_name?.[0]}
                           </div>
                         </Menu.Button>
                       </div>
                       <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                        <div className="px-4 py-2 border-b border-slate-200">
-                          <p className="text-sm font-medium text-slate-900">{user?.first_name} {user?.last_name}</p>
-                          <p className="text-xs text-slate-500">{user?.email}</p>
-                          <p className="text-xs text-green-600 font-semibold">💰 {user?.coins?.toLocaleString() || '0'} coins</p>
+                        <div className="px-4 py-2 border-b border-gray-200">
+                          <p className="text-sm font-medium text-gray-900">{user?.first_name} {user?.last_name}</p>
+                          <p className="text-xs text-gray-500">{user?.email}</p>
+                          <p className="text-xs text-[#ff3131] font-semibold">💰 {user?.coins?.toLocaleString() || '0'} coins</p>
                         </div>
                         {userNavigation.map((item) => (
                           <Menu.Item key={item.name}>
@@ -154,8 +164,8 @@ export default function Navbar() {
                               <button
                                 onClick={() => handleUserAction(item)}
                                 className={classNames(
-                                  active ? 'bg-slate-100' : '',
-                                  'block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100'
+                                  active ? 'bg-gray-100' : '',
+                                  'block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100'
                                 )}
                               >
                                 {item.name}
@@ -170,14 +180,14 @@ export default function Navbar() {
                     <div className="flex space-x-4">
                       <Link
                         to="/login"
-                        className="text-slate-800 hover:bg-slate-700 hover:text-white rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
+                        className="text-white hover:bg-[#ff3131] hover:text-black rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
                         style={{ pointerEvents: 'auto' }}
                       >
                         Sign in
                       </Link>
                       <Link
                         to="/register"
-                        className="bg-slate-800 text-white hover:bg-slate-700 rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
+                        className="bg-[#ff3131] text-black hover:bg-red-600 rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
                         style={{ pointerEvents: 'auto' }}
                       >
                         Sign up
@@ -189,7 +199,7 @@ export default function Navbar() {
 
               <div className="-mr-2 flex md:hidden">
                 {/* Mobile menu button */}
-                <Disclosure.Button className="relative inline-flex items-center justify-center rounded-md bg-slate-800 p-2 text-white hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-slate-800 z-10">
+                <Disclosure.Button className="relative inline-flex items-center justify-center rounded-md bg-[#ff3131] p-2 text-black hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-800 z-10">
                   <span className="absolute -inset-0.5" />
                   <span className="sr-only">Open main menu</span>
                   {open ? (
@@ -205,14 +215,14 @@ export default function Navbar() {
           <Disclosure.Panel className="md:hidden relative z-40">
             <div className="space-y-1 px-2 pb-3 pt-2 sm:px-3 bg-white">
               {isAuthenticated && (
-                <div className="mb-3 p-3 bg-slate-50 rounded-lg">
+                <div className="mb-3 p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-slate-900">💰 {user?.coins?.toLocaleString() || '0'} coins</span>
+                    <span className="text-sm font-medium text-gray-900">💰 {user?.coins?.toLocaleString() || '0'} coins</span>
                   </div>
                   <button
                     onClick={handleGetCoins}
                     disabled={addingCoins}
-                    className="w-full bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+                    className="w-full bg-[#ff3131] text-black hover:bg-red-600 disabled:bg-red-400 rounded-md px-3 py-2 text-sm font-medium transition-colors"
                   >
                     {addingCoins ? 'Adding...' : 'Get 10K Coins'}
                   </button>
@@ -225,8 +235,8 @@ export default function Navbar() {
                   to={item.href}
                   className={classNames(
                     location.pathname === item.href
-                      ? 'bg-slate-800 text-white'
-                      : 'text-slate-800 hover:bg-slate-700 hover:text-white',
+                      ? 'bg-[#ff3131] text-black'
+                      : 'text-gray-800 hover:bg-[#ff3131] hover:text-black',
                     'block rounded-md px-3 py-2 text-base font-medium transition-colors'
                   )}
                   style={{ pointerEvents: 'auto' }}
@@ -237,15 +247,15 @@ export default function Navbar() {
             </div>
 
             {isAuthenticated ? (
-              <div className="border-t border-slate-200 pb-3 pt-4 bg-white">
+              <div className="border-t border-gray-200 pb-3 pt-4 bg-white">
                 <div className="flex items-center px-5">
-                  <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                  <div className="h-10 w-10 rounded-full bg-[#ff3131] flex items-center justify-center text-black font-semibold">
                     {user?.first_name?.[0]}{user?.last_name?.[0]}
                   </div>
                   <div className="ml-3">
-                    <div className="text-base font-medium text-slate-800">{user?.first_name} {user?.last_name}</div>
-                    <div className="text-sm text-slate-500">{user?.email}</div>
-                    <div className="text-sm text-green-600 font-semibold">💰 {user?.coins?.toLocaleString() || '0'} coins</div>
+                    <div className="text-base font-medium text-gray-800">{user?.first_name} {user?.last_name}</div>
+                    <div className="text-sm text-gray-500">{user?.email}</div>
+                    <div className="text-sm text-[#ff3131] font-semibold">💰 {user?.coins?.toLocaleString() || '0'} coins</div>
                   </div>
                 </div>
                 <div className="mt-3 space-y-1 px-2">
@@ -253,7 +263,7 @@ export default function Navbar() {
                     <button
                       key={item.name}
                       onClick={() => handleUserAction(item)}
-                      className="block w-full text-left rounded-md px-3 py-2 text-base font-medium text-slate-800 hover:bg-slate-100"
+                      className="block w-full text-left rounded-md px-3 py-2 text-base font-medium text-gray-800 hover:bg-gray-100"
                     >
                       {item.name}
                     </button>
@@ -261,18 +271,18 @@ export default function Navbar() {
                 </div>
               </div>
             ) : (
-              <div className="border-t border-slate-200 pb-3 pt-4 bg-white">
+              <div className="border-t border-gray-200 pb-3 pt-4 bg-white">
                 <div className="space-y-1 px-2">
                   <Link
                     to="/login"
-                    className="block rounded-md px-3 py-2 text-base font-medium text-slate-800 hover:bg-slate-100"
+                    className="block rounded-md px-3 py-2 text-base font-medium text-gray-800 hover:bg-gray-100"
                     style={{ pointerEvents: 'auto' }}
                   >
                     Sign in
                   </Link>
                   <Link
                     to="/register"
-                    className="block rounded-md px-3 py-2 text-base font-medium text-slate-800 hover:bg-slate-100"
+                    className="block rounded-md px-3 py-2 text-base font-medium text-gray-800 hover:bg-gray-100"
                     style={{ pointerEvents: 'auto' }}
                   >
                     Sign up

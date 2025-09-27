@@ -30,16 +30,16 @@ export default function Leaderboard() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-red-900 py-8">
+    <div className="min-h-screen bg-[#19191E] py-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white">Leaderboard</h1>
-          <p className="mt-2 text-slate-300">Top performers across all universities</p>
+          <p className="mt-2 text-gray-300">Top performers across all universities</p>
         </div>
 
         {/* Tabs */}
         <div className="mb-8">
-          <div className="border-b border-slate-700">
+          <div className="border-b border-gray-700">
             <nav className="flex space-x-8">
               {tabs.map(({ key, name, icon: Icon }) => (
                 <button
@@ -47,8 +47,8 @@ export default function Leaderboard() {
                   onClick={() => setActiveTab(key)}
                   className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                     activeTab === key
-                      ? 'border-blue-500 text-blue-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-600'
+                      ? 'border-[#ff3131] text-[#ff3131]'
+                      : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
                   }`}
                 >
                   <Icon className="h-5 w-5 mr-2" />
@@ -60,41 +60,41 @@ export default function Leaderboard() {
         </div>
 
         {/* Leaderboard Table */}
-        <div className="bg-slate-800 rounded-lg shadow-lg border border-slate-700 overflow-hidden">
+        <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-700">
-              <thead className="bg-slate-900">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead className="bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Rank
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Player
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     University
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Win Rate
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Games
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Earnings
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-slate-800 divide-y divide-slate-700">
+              <tbody className="bg-gray-800 divide-y divide-gray-700">
                 {leaderboardData[activeTab].map((player) => (
-                  <tr key={player.rank} className="hover:bg-slate-700 transition-colors">
+                  <tr key={player.rank} className="hover:bg-gray-700 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         {player.rank === 1 && <TrophyIcon className="h-5 w-5 text-yellow-400 mr-2" />}
-                        {player.rank === 2 && <TrophyIcon className="h-5 w-5 text-slate-400 mr-2" />}
+                        {player.rank === 2 && <TrophyIcon className="h-5 w-5 text-gray-400 mr-2" />}
                         {player.rank === 3 && <TrophyIcon className="h-5 w-5 text-amber-600 mr-2" />}
                         <span className="text-sm font-medium text-white">#{player.rank}</span>
                       </div>
@@ -107,8 +107,8 @@ export default function Leaderboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <AcademicCapIcon className="h-4 w-4 text-blue-400 mr-2" />
-                        <span className="text-sm text-slate-300">{player.university}</span>
+                        <AcademicCapIcon className="h-4 w-4 text-[#ff3131] mr-2" />
+                        <span className="text-sm text-gray-300">{player.university}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -122,16 +122,16 @@ export default function Leaderboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="w-16 bg-slate-700 rounded-full h-2 mr-3">
+                        <div className="w-16 bg-gray-700 rounded-full h-2 mr-3">
                           <div 
-                            className="bg-gradient-to-r from-red-500 to-blue-500 h-2 rounded-full" 
+                            className="bg-[#ff3131] h-2 rounded-full" 
                             style={{ width: `${player.winRate}%` }}
                           ></div>
                         </div>
                         <span className="text-sm text-white">{player.winRate}%</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {player.games.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-400">
@@ -146,17 +146,17 @@ export default function Leaderboard() {
 
         {/* Stats Cards */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <h3 className="text-lg font-semibold text-white mb-2">Total Players</h3>
-            <p className="text-3xl font-bold text-blue-400">1,247</p>
+            <p className="text-3xl font-bold text-[#ff3131]">1,247</p>
           </div>
-          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <h3 className="text-lg font-semibold text-white mb-2">Active Bots</h3>
-            <p className="text-3xl font-bold text-purple-400">856</p>
+            <p className="text-3xl font-bold text-[#ff3131]">856</p>
           </div>
-          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <h3 className="text-lg font-semibold text-white mb-2">Total Prize Pool</h3>
-            <p className="text-3xl font-bold text-green-400">$2.4M</p>
+            <p className="text-3xl font-bold text-[#ff3131]">$2.4M</p>
           </div>
         </div>
       </div>
