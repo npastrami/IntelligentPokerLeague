@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PlusIcon, CpuChipIcon, CurrencyDollarIcon, HandRaisedIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { useAuth } from '../context/AuthContext'
 
 export default function GamesList() {
   const navigate = useNavigate()
+  const { user, updateUser } = useAuth()
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showStartGameModal, setShowStartGameModal] = useState(false)
   const [selectedGame, setSelectedGame] = useState(null)
@@ -13,6 +15,8 @@ export default function GamesList() {
   const [userBots, setUserBots] = useState([])
   const [loading, setLoading] = useState(false)
   const [availableGames, setAvailableGames] = useState([])
+  const [userCoins, setUserCoins] = useState(0)
+  const [startError, setStartError] = useState('')
   
   const [formData, setFormData] = useState({
     botName: '',
@@ -34,6 +38,19 @@ export default function GamesList() {
   // Fetch available games on mount
   useEffect(() => {
     fetchAvailableGames()
+    fetchUserCoins()
+    
+    // Fallback: Try to get coins from header element if API fails
+    const headerCoinsElement = document.querySelector('[class*="coins"]')
+    if (headerCoinsElement && userCoins === 0) {
+      const headerText = headerCoinsElement.textContent
+      const coinsMatch = headerText.match(/(\d{1,3}(?:,\d{3})*)\s*coins/)
+      if (coinsMatch) {
+        const headerCoins = parseInt(coinsMatch[1].replace(/,/g, ''))
+        console.log('Fallback: Using coins from header:', headerCoins)
+        setUserCoins(headerCoins)
+      }
+    }
   }, [])
 
   const fetchAvailableGames = async () => {
@@ -45,6 +62,35 @@ export default function GamesList() {
       }
     } catch (error) {
       console.error('Error fetching available games:', error)
+    }
+  }
+
+  const fetchUserCoins = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      console.log('Fetching coins with token:', token ? 'present' : 'missing')
+      
+      const response = await fetch('/api/users/profile/', {
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      console.log('Response status:', response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Profile data:', data)
+        console.log('Coins from API:', data.coins)
+        setUserCoins(data.coins || 0)
+      } else {
+        console.error('Profile fetch failed:', response.status, response.statusText)
+        const errorData = await response.text()
+        console.error('Error response:', errorData)
+      }
+    } catch (error) {
+      console.error('Error fetching user coins:', error)
     }
   }
 
@@ -133,10 +179,25 @@ export default function GamesList() {
     setGameMode('human')
     setSelectedPlayerBot('')
     setBuyInAmount('200') // Reset to default
+    setStartError('') // Clear any previous errors
+    // Refresh coin balance when opening modal
+    fetchUserCoins()
   }
 
   const handleStartGame = async () => {
     if (!selectedGame) return
+
+    // Clear any previous errors
+    setStartError('')
+    
+    // Validate buy-in amount for human games
+    if (gameMode === 'human') {
+      const buyInValue = parseInt(buyInAmount)
+      if (userCoins < buyInValue) {
+        setStartError(`Insufficient coins. You need ${buyInValue} but have ${userCoins}.`)
+        return
+      }
+    }
 
     setLoading(true)
     try {
@@ -161,20 +222,37 @@ export default function GamesList() {
         const data = await response.json()
         setShowStartGameModal(false)
         
+        // Update user coins if this was a human game
+        if (gameMode === 'human' && data.player_coins_remaining !== undefined) {
+          const newCoinBalance = data.player_coins_remaining
+          setUserCoins(newCoinBalance)
+          
+          // Update global user context so navbar shows new balance
+          updateUser({ ...user, coins: newCoinBalance })
+        }
+        
         if (gameMode === 'human') {
           navigate(`/game/human/${data.session_id}`)
         } else {
           navigate(`/game/bot/${data.session_id}`)
         }
       } else {
-        console.error('Failed to initialize game')
+        const errorData = await response.json()
+        setStartError(errorData.error || 'Failed to initialize game')
       }
     } catch (error) {
       console.error('Error starting game:', error)
+      setStartError('Connection error. Please try again.')
     } finally {
       setLoading(false)
     }
   }
+
+  // Check if user can afford the selected buy-in
+  const canAffordBuyIn = gameMode === 'bot' || userCoins >= parseInt(buyInAmount)
+  
+  // Debug logging
+  console.log('Debug - userCoins:', userCoins, 'buyInAmount:', parseInt(buyInAmount), 'canAfford:', canAffordBuyIn)
 
   return (
     <div className="min-h-screen bg-[#19191E] py-8">
@@ -182,7 +260,12 @@ export default function GamesList() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white">Available Games</h1>
-          <p className="mt-2 text-gray-300">Challenge other bots or post your own for matches</p>
+          <p className="mt-2 text-gray-300">
+            Challenge other bots or post your own for matches
+          </p>
+          <p className="mt-1 text-sm text-gray-400">
+            Your balance: <span className="text-[#ff3131] font-medium">{userCoins.toLocaleString()} coins</span>
+          </p>
         </div>
 
         {/* Create Game Button */}
@@ -345,6 +428,13 @@ export default function GamesList() {
                 </div>
               )}
 
+              {/* Error message */}
+              {startError && (
+                <div className="mb-4 p-3 bg-red-600 rounded-lg">
+                  <p className="text-white text-sm">{startError}</p>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-white mb-2">
@@ -391,11 +481,24 @@ export default function GamesList() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-gray-400 text-xs mt-1">
-                    {gameMode === 'human' 
-                      ? 'Amount you will buy in with to play' 
-                      : 'Amount your bot will buy in with to play'}
-                  </p>
+                  
+                  {/* Buy-in validation feedback */}
+                  <div className="mt-1 text-xs">
+                    {gameMode === 'human' ? (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">
+                          Amount you will buy in with to play
+                        </span>
+                        <span className={canAffordBuyIn ? 'text-green-400' : 'text-red-400'}>
+                          {canAffordBuyIn ? '✓ Affordable' : '✗ Insufficient coins'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">
+                        Amount your bot will buy in with to play
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {gameMode === 'bot' && (
@@ -426,7 +529,9 @@ export default function GamesList() {
                 <div className="flex space-x-3 pt-4">
                   <button
                     onClick={handleStartGame}
-                    disabled={loading || (gameMode === 'bot' && !selectedPlayerBot)}
+                    disabled={loading || 
+                             (gameMode === 'bot' && !selectedPlayerBot) ||
+                             (gameMode === 'human' && !canAffordBuyIn)}
                     className="flex-1 rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-black hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? 'Starting...' : 'Start Game'}

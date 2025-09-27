@@ -67,10 +67,10 @@ def initialize_game(request):
                 hands_to_play=hands_to_play,
                 player_stack=buy_in_amount,  # Use buy_in_amount
                 bot_stack=buy_in_amount,     # Use buy_in_amount
-                current_coins=0
+                current_coins=0  # No coins needed for bot vs bot
             )
         else:
-            # Human vs Bot mode
+            # Human vs Bot mode - FIX: Proper buy-in processing
             opponent_bot_id = data.get('opponent_bot_id')
             opponent_bot = None
             
@@ -84,26 +84,32 @@ def initialize_game(request):
             if player.coins < buy_in_amount:
                 return JsonResponse({'error': f'Insufficient coins. You need {buy_in_amount} but have {player.coins}'}, status=400)
             
-            # Create session for human vs bot
+            # Create session for human vs bot but DON'T deduct coins yet
             session = GameSession.objects.create(
                 session_id=str(uuid.uuid4()),
                 player=player,
                 play_mode='human',
                 opponent_bot=opponent_bot,
                 hands_to_play=1,  # Ongoing for human games
-                player_stack=buy_in_amount,  # Use buy_in_amount
-                bot_stack=buy_in_amount,     # Use buy_in_amount
-                current_coins=buy_in_amount  # Track coins used
+                player_stack=buy_in_amount,  # Set initial stacks
+                bot_stack=buy_in_amount,     
+                current_coins=buy_in_amount  # Track intended buy-in amount
             )
             
-            # Deduct coins from player for buy-in
-            player.coins -= buy_in_amount
-            player.save()
+            # FIX: Deduct coins from player for buy-in immediately
+            try:
+                player.remove_coins(buy_in_amount)
+                logger.info(f"Deducted {buy_in_amount} coins from player {player.username}. New balance: {player.coins}")
+            except ValueError as e:
+                # If deduction fails, delete the session and return error
+                session.delete()
+                return JsonResponse({'error': str(e)}, status=400)
         
         return JsonResponse({
             'session_id': session.session_id,
             'mode': game_mode,
             'buy_in_amount': buy_in_amount,
+            'player_coins_remaining': player.coins,
             'message': 'Game initialized successfully'
         })
         
@@ -125,7 +131,7 @@ def join_game(request):
         session = get_object_or_404(GameSession, session_id=session_id, player=request.user)
         game_manager = PokerGameManager(session)
         
-        # Start a new hand
+        # Start a new hand - no additional buy-in processing needed here
         continue_session = session.hands_played > 0
         game_state = game_manager.start_new_hand(continue_session=continue_session)
         
@@ -241,30 +247,41 @@ def start_hand(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def buy_in(request):
-    """Process buy-in for human vs bot games"""
+    """Process additional buy-in for human vs bot games (rebuy functionality)"""
     try:
         data = request.data
         session_id = data.get('session_id')
+        rebuy_amount = data.get('amount', 200)
         
         if not session_id:
             return JsonResponse({'error': 'Session ID required'}, status=400)
         
         session = get_object_or_404(GameSession, session_id=session_id, player=request.user)
-        game_manager = PokerGameManager(session)
+        player = request.user
         
-        # Validate and process buy-in
-        if not game_manager.validate_buy_in():
-            return JsonResponse({'error': 'Insufficient coins for buy-in'}, status=400)
+        # Check if player has enough coins
+        if player.coins < rebuy_amount:
+            return JsonResponse({'error': f'Insufficient coins for rebuy. You need {rebuy_amount} but have {player.coins}'}, status=400)
         
-        success, message = game_manager.process_buy_in()
-        
-        if success:
-            return JsonResponse({'message': message})
-        else:
-            return JsonResponse({'error': message}, status=400)
+        # Process rebuy
+        try:
+            player.remove_coins(rebuy_amount)
+            session.player_stack += rebuy_amount
+            session.current_coins += rebuy_amount
+            session.save()
+            
+            logger.info(f"Player {player.username} rebuyed {rebuy_amount} coins. New stack: {session.player_stack}")
+            
+            return JsonResponse({
+                'message': f'Rebuy successful. Added {rebuy_amount} chips to your stack.',
+                'new_stack': session.player_stack,
+                'coins_remaining': player.coins
+            })
+        except ValueError as e:
+            return JsonResponse({'error': str(e)}, status=400)
         
     except Exception as e:
-        logger.error(f"Error processing buy-in: {str(e)}")
+        logger.error(f"Error processing rebuy: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
 @api_view(['POST'])
@@ -286,7 +303,8 @@ def exit_game(request):
         
         return JsonResponse({
             'message': 'Game exited successfully',
-            'returned_coins': returned_coins
+            'returned_coins': returned_coins,
+            'new_coin_balance': request.user.coins
         })
         
     except Exception as e:

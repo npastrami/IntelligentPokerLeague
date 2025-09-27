@@ -384,10 +384,7 @@ class PokerGameManager:
             self.opponent_bot = BotInterface(bot_repository=session.opponent_bot)
             logger.info(f"Opponent bot loaded: {self.opponent_bot is not None}")
         
-        self.buy_in_amount = 200
-        self.total_pot = 0
-        self.player_total_bet = 0 
-        self.bot_total_bet = 0
+        self.buy_in_amount = getattr(session, 'current_coins', 200)
         
         # Player loggers
         self.player_a_logs = Queue()  # For player/player_bot outputs
@@ -598,10 +595,6 @@ class PokerGameManager:
         # Create a fresh deck for this hand
         self.deck = eval7.Deck()
         
-        self.total_pot = 0
-        self.player_total_bet = 0
-        self.bot_total_bet = 0
-        
         # Add round separator to logs
         if continue_session:
             round_num = self.session.hands_played + 1
@@ -611,13 +604,6 @@ class PokerGameManager:
             # Add round info to player logs
             self.log_player_message(0, f"\nStarting Round #{round_num} with bankroll: {self.session.player_stack}\n")
             self.log_player_message(1, f"\nStarting Round #{round_num} with bankroll: {self.session.bot_stack}\n")
-        
-        # Check if buy-in is needed for human vs bot mode
-        if not self.is_bot_vs_bot and not continue_session and (not hasattr(self.session, 'current_coins') or self.session.current_coins == 0):
-            return {
-                'requires_buy_in': True,
-                'buy_in_amount': self.buy_in_amount
-            }
             
         self.deck.shuffle()
         player_cards = self.deck.deal(2)
@@ -672,12 +658,12 @@ class PokerGameManager:
         # Log the initial round state
         self.log_round_state(round_state)
 
-        # Update session
+        # Update session - FIX: Properly track stacks
         self.session.player_cards = player_cards
         self.session.board_cards = []
         self.session.pot = sum(pips)  # Track pot correctly
-        self.session.player_stack = stacks[0]
-        self.session.bot_stack = stacks[1]
+        self.session.player_stack = stacks[0]  # Update player stack
+        self.session.bot_stack = stacks[1]     # Update bot stack
         self.session.current_street = 'preflop'
         self.session.game_state = self._serialize_game_state(round_state)
         self.session.save()
@@ -719,7 +705,10 @@ class PokerGameManager:
             'game_message': game_message,
             'is_bot_vs_bot': self.is_bot_vs_bot,
             'current_player': current_player,
-            'is_player_turn': is_player_turn
+            'is_player_turn': is_player_turn,
+            'showdown': False,
+            'showdown_cards': {},
+            'winner': None
         }
 
     def process_player_action(self, action_type, amount=0):
@@ -837,23 +826,34 @@ class PokerGameManager:
             bot_action_msg = "Hand complete!"
             print("Hand complete after player action")
         
-        # Update session from round state
+        # Update session from round state - FIX: Properly update stacks and pot
         print(f"\n=== UPDATING SESSION ===")
-        old_cards = self.session.player_cards.copy() if self.session.player_cards else []
-        old_board = self.session.board_cards.copy() if self.session.board_cards else []
-        
         self._update_session_from_round_state(next_state)
-        
-        print(f"Old player cards: {old_cards}")
-        print(f"New player cards: {self.session.player_cards}")
-        print(f"Old board cards: {old_board}")
-        print(f"New board cards: {self.session.board_cards}")
         
         # FIXED: Determine whose turn it is next
         if isinstance(next_state, TerminalState):
+            # Log terminal state for showdown info
+            self.log_terminal_state(next_state)
+            
+            # Check if we need showdown (both players didn't fold)
+            is_showdown = (next_state.previous_state and 
+                          FoldAction not in next_state.previous_state.legal_actions())
+            
             is_player_turn = False  # No one's turn, hand is complete
             current_player = None
             print("Terminal state - no player turn")
+            
+            # Determine winner
+            if next_state.deltas[0] > 0:
+                winner = 'player'
+            elif next_state.deltas[0] < 0:
+                winner = 'bot'
+            else:
+                winner = 'tie'
+                
+            # Update hands played count
+            self.session.hands_played += 1
+            self.session.save()
         else:
             # Correct turn logic for heads-up poker
             if next_state.street == 0:  # Preflop
@@ -868,6 +868,8 @@ class PokerGameManager:
             print(f"Street: {next_state.street} ({'preflop' if next_state.street == 0 else 'post-flop'})")
             print(f"Button: {next_state.button}, Button % 2: {next_state.button % 2}")
             print(f"Is player turn: {is_player_turn}, Current player: {current_player}")
+            is_showdown = False
+            winner = None
         
         # Get betting information for ongoing hands
         if not isinstance(next_state, TerminalState):
@@ -899,12 +901,25 @@ class PokerGameManager:
             'is_player_turn': is_player_turn,
             'hands_played': self.session.hands_played if self.is_bot_vs_bot else 0,
             'hands_to_play': self.session.hands_to_play if self.is_bot_vs_bot else 0,
-            'game_complete': self.session.hands_played >= self.session.hands_to_play if self.is_bot_vs_bot else False
+            'game_complete': self.session.hands_played >= self.session.hands_to_play if self.is_bot_vs_bot else False,
+            'showdown': isinstance(next_state, TerminalState) and is_showdown,
+            'showdown_cards': self._get_showdown_cards(next_state) if isinstance(next_state, TerminalState) and is_showdown else {},
+            'winner': winner if isinstance(next_state, TerminalState) else None
         }
         
         print(f"=== END PLAYER ACTION ===\n")
         
         return response_data
+    
+    def _get_showdown_cards(self, terminal_state):
+        """Get cards for showdown display"""
+        if not terminal_state.previous_state:
+            return {}
+            
+        return {
+            'player_cards': self.convert_cards_to_display(terminal_state.previous_state.hands[0]),
+            'bot_cards': self.convert_cards_to_display(terminal_state.previous_state.hands[1])
+        }
     
     def process_exit_game(self):
         """Process player exit and return remaining coins"""
@@ -992,27 +1007,32 @@ class PokerGameManager:
     def _get_game_message(self, round_state, bot_action_msg=""):
         """Generate appropriate game message based on state"""
         if isinstance(round_state, TerminalState):
-            if self.is_bot_vs_bot:
-                # Messages for bot vs bot mode
-                player_bot_name = getattr(self.session.player_bot, 'name', 'Player bot')
-                opponent_bot_name = getattr(self.session.opponent_bot, 'name', 'Opponent bot')
-                
-                if round_state.deltas[0] > 0:
-                    return f"{player_bot_name} wins ${self.total_pot}! Click 'Next Hand' to continue."
-                elif round_state.deltas[0] < 0:
-                    return f"{opponent_bot_name} wins ${self.total_pot}. Click 'Next Hand' to continue."
-                else:
-                    split_amount = self.total_pot // 2
-                    return f"Split pot! Each bot wins ${split_amount}. Click 'Next Hand' to continue."
+            # Check if showdown occurred
+            is_showdown = (round_state.previous_state and 
+                          FoldAction not in round_state.previous_state.legal_actions())
+            
+            if is_showdown:
+                return "Showdown! Cards revealed."
             else:
-                # Messages for human vs bot mode
-                if round_state.deltas[0] > 0:
-                    return f"You win ${self.total_pot}! Click 'Next Hand' to continue."
-                elif round_state.deltas[0] < 0:
-                    return f"Bot wins ${self.total_pot}. Click 'Next Hand' to continue."
+                if self.is_bot_vs_bot:
+                    # Messages for bot vs bot mode
+                    player_bot_name = getattr(self.session.player_bot, 'name', 'Player bot')
+                    opponent_bot_name = getattr(self.session.opponent_bot, 'name', 'Opponent bot')
+                    
+                    if round_state.deltas[0] > 0:
+                        return f"{player_bot_name} wins! Click 'Next Hand' to continue."
+                    elif round_state.deltas[0] < 0:
+                        return f"{opponent_bot_name} wins. Click 'Next Hand' to continue."
+                    else:
+                        return f"Split pot! Click 'Next Hand' to continue."
                 else:
-                    split_amount = self.total_pot // 2
-                    return f"Split pot! Each player wins ${split_amount}. Click 'Next Hand' to continue."
+                    # Messages for human vs bot mode
+                    if round_state.deltas[0] > 0:
+                        return f"You win! Click 'Next Hand' to continue."
+                    elif round_state.deltas[0] < 0:
+                        return f"Bot wins. Click 'Next Hand' to continue."
+                    else:
+                        return f"Split pot! Click 'Next Hand' to continue."
         elif bot_action_msg:
             if self.is_bot_vs_bot:
                 player_bot_name = getattr(self.session.player_bot, 'name', 'Player bot')
@@ -1027,12 +1047,30 @@ class PokerGameManager:
     def _update_session_from_round_state(self, round_state):
         """Update session with current round state"""
         if isinstance(round_state, TerminalState):
+            # Update stacks based on deltas from terminal state
+            starting_stacks = [self.settings.STARTING_STACK, self.settings.STARTING_STACK]
+            if round_state.previous_state:
+                starting_stacks = round_state.previous_state.stacks
+            
+            self.session.player_stack = starting_stacks[0] + round_state.deltas[0]
+            self.session.bot_stack = starting_stacks[1] + round_state.deltas[1]
+            
+            # Pot goes to zero after terminal state
+            self.session.pot = 0
+            
             if round_state.previous_state and round_state.previous_state.street > 0:
                 street = round_state.previous_state.street
                 visible_cards = round_state.previous_state.deck[:street]
                 self.session.board_cards = visible_cards
-                # Don't modify pot in terminal state
         else:
+            # Update stacks from current round state
+            self.session.player_stack = round_state.stacks[0]
+            self.session.bot_stack = round_state.stacks[1]
+            
+            # Calculate pot as total chips invested by both players
+            total_invested = (self.settings.STARTING_STACK * 2) - sum(round_state.stacks)
+            self.session.pot = total_invested
+            
             if round_state.street > 0:
                 visible_cards = round_state.deck[:round_state.street]
                 self.session.board_cards = visible_cards
@@ -1080,7 +1118,6 @@ class PokerGameManager:
                 'terminal': True,
                 'deltas': round_state.deltas if hasattr(round_state, 'deltas') else None,
                 'button': round_state.previous_state.button if round_state.previous_state else 0,
-                'total_pot': self.total_pot  # Save total_pot in the game state
             }
         return {
             'terminal': False,
@@ -1091,16 +1128,12 @@ class PokerGameManager:
             'stacks': round_state.stacks,
             'hands': [[str(c) for c in h] for h in round_state.hands],
             'deck': [str(c) for c in round_state.deck],
-            'total_pot': self.total_pot  # Save total_pot in the game state
         }
 
     def _deserialize_game_state(self, state_dict):
         """Deserialize the stored game state"""
         if not state_dict or state_dict.get('terminal', False):
             return None
-
-        # Restore total_pot from game state
-        self.total_pot = state_dict.get('total_pot', 0)
 
         try:
             return RoundState(
@@ -1139,7 +1172,10 @@ class PokerGameManager:
             'is_player_turn': False,
             'hands_played': self.session.hands_played if self.is_bot_vs_bot else 0,
             'hands_to_play': self.session.hands_to_play if self.is_bot_vs_bot else 0,
-            'game_complete': self.session.hands_played >= self.session.hands_to_play if self.is_bot_vs_bot else False
+            'game_complete': self.session.hands_played >= self.session.hands_to_play if self.is_bot_vs_bot else False,
+            'showdown': False,
+            'showdown_cards': {},
+            'winner': None
         }
 
 
