@@ -24,6 +24,12 @@ urlpatterns = [
     path('run-code/', views.run_code, name='run_code'),
 
     # Development environment
+    path('create-file/', views.create_file, name='create_file'),
+    path('list-files/', views.list_user_files, name='list_user_files'),
+    path('upload-file/', views.upload_file, name='upload_file'),  
+    path('load-file/<str:filename>/', views.load_file, name='load_file'), 
+    path('save-file/', views.save_file_to_storage, name='save_file_to_storage'),  
+    path('dev/create-file/', views.create_file, name='create_file'),
     path('dev/save-code/', views.save_code, name='save_code'),
     path('dev/run-code/', views.run_code, name='run_code'),
     path('dev/skeletons/', views.get_skeleton_files, name='get_skeleton_files'),
@@ -33,8 +39,6 @@ urlpatterns = [
     path('bot-game/start/', views.start_bot_game_simulation, name='start_bot_game'),
     path('bot-game/pause/', views.pause_bot_game_simulation, name='pause_bot_game'),
     path('bot-game/status/', views.get_bot_game_progress, name='bot_game_status'),
-    
-
 
     # Bot management endpoints
     path('get-opponent-bots/', views.get_available_opponent_bots, name='get_available_opponent_bots'),

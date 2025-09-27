@@ -12,6 +12,7 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.utils.decorators import method_decorator
 from django.contrib.auth import get_user_model
+from storages.backends.s3boto3 import S3Boto3Storage
 from pathlib import Path
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -316,6 +317,193 @@ def save_code(request):
     except Exception as e:
         logger.error(f"Error saving code: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
+
+from storages.backends.s3boto3 import S3Boto3Storage
+from django.conf import settings
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from django.http import JsonResponse
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_file(request):
+    try:
+        user_id = request.user.id
+        filename = request.data.get('filename')
+
+        if not filename:
+            return JsonResponse({'error': 'Filename is required'}, status=400)
+
+        object_key = f"files/{user_id}/{filename}"
+        storage = S3Boto3Storage()
+        s3_client = storage.connection.meta.client
+        bucket_name = storage.bucket_name
+
+        # Default content based on file extension
+        ext = filename.split('.')[-1].lower()
+        if ext == 'py':
+            content = "# New Python file\n\ndef poker_bot():\n    return 'call'\n"
+        elif ext == 'js':
+            content = "// New JavaScript file\n\nclass PokerBot {\n  makeDecision() { return 'call'; }\n}\n"
+        else:
+            content = "// New bot file\n\nclass PokerBot {\n  makeDecision() { return 'call'; }\n}\n"
+
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=object_key,
+            Body=content.encode('utf-8'),
+            ContentType='text/plain'
+        )
+
+        return JsonResponse({'message': 'File created', 'key': object_key})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from django.http import JsonResponse
+from storages.backends.s3boto3 import S3Boto3Storage
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_user_files(request):
+    user_id = request.user.id
+    prefix = f"files/{user_id}/"
+
+    storage = S3Boto3Storage()
+    s3_client = storage.connection.meta.client
+
+    bucket_name = storage.bucket_name  
+
+    try:
+        response = s3_client.list_objects_v2(
+            Bucket=bucket_name,
+            Prefix=prefix,
+            Delimiter='/'
+        )
+        
+       
+        folders = [p['Prefix'].replace(prefix, '').replace('/', '') for p in response.get('CommonPrefixes', [])]
+        files = [obj['Key'].replace(prefix, '') for obj in response.get('Contents', []) if obj['Key'] != prefix]
+
+        data = {
+            'folders': folders,
+            'files': files
+        }
+
+        return JsonResponse(data)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_file(request):
+    """Upload a code file"""
+    try:
+        if 'file' not in request.FILES:
+            return JsonResponse({'error': 'No file uploaded'}, status=400)
+        
+        uploaded_file = request.FILES['file']
+        
+        # Check file extension
+        allowed_extensions = ['.py', '.wls', '.js']
+        file_extension = os.path.splitext(uploaded_file.name)[1].lower()
+        
+        if file_extension not in allowed_extensions:
+            return JsonResponse({'error': 'Unsupported file type. Please upload a .py, .wls, or .js file'}, status=400)
+        
+        # Read file content
+        content = uploaded_file.read().decode('utf-8')
+        
+        # Save to S3/MinIO storage
+        user_id = request.user.id
+        print(user_id)
+        object_key = f"files/{user_id}/{uploaded_file.name}"
+        
+        storage = S3Boto3Storage()
+        s3_client = storage.connection.meta.client
+        bucket_name = storage.bucket_name
+        
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=object_key,
+            Body=content.encode('utf-8'),
+            ContentType='text/plain'
+        )
+        
+        return JsonResponse({
+            'message': 'File uploaded successfully',
+            'filename': uploaded_file.name,
+            'content': content
+        })
+        
+    except Exception as e:
+        logger.error(f"Error uploading file: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def load_file(request, filename):
+    """Load file content from storage"""
+    try:
+        user_id = request.user.id
+        object_key = f"files/{user_id}/{filename}"
+        
+        storage = S3Boto3Storage()
+        s3_client = storage.connection.meta.client
+        bucket_name = storage.bucket_name
+        
+        # Get file from S3/MinIO
+        response = s3_client.get_object(Bucket=bucket_name, Key=object_key)
+        content = response['Body'].read().decode('utf-8')
+        
+        return JsonResponse({
+            'content': content,
+            'filename': filename
+        })
+        
+    except s3_client.exceptions.NoSuchKey:
+        return JsonResponse({'error': 'File not found'}, status=404)
+    except Exception as e:
+        logger.error(f"Error loading file: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_file_to_storage(request):
+    """Save file content to S3/MinIO storage"""
+    try:
+        data = request.data
+        filename = data.get('filename')
+        content = data.get('content', '')
+        
+        if not filename:
+            return JsonResponse({'error': 'Filename is required'}, status=400)
+        
+        user_id = request.user.id
+        object_key = f"files/{user_id}/{filename}"
+        
+        storage = S3Boto3Storage()
+        s3_client = storage.connection.meta.client
+        bucket_name = storage.bucket_name
+        
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=object_key,
+            Body=content.encode('utf-8'),
+            ContentType='text/plain'
+        )
+        
+        return JsonResponse({'message': 'File saved successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error saving file to storage: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
