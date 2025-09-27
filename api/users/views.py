@@ -1,4 +1,6 @@
 from rest_framework import status
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -8,6 +10,8 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.crypto import get_random_string
 from django.urls import reverse
+import json
+from django.http import JsonResponse
 from .models import CustomUser
 from .serializers import (
     UserRegistrationSerializer, 
@@ -152,3 +156,36 @@ def user_stats(request):
         'total_users': total_users,
         'active_users': active_users,
     })
+    
+@csrf_exempt
+@require_http_methods(["POST"])
+def add_coins(request):
+    """Add coins to user's account"""
+    try:
+        # Get token from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if not auth_header.startswith('Token '):
+            return JsonResponse({'error': 'Authentication required'}, status=401)
+        
+        token_key = auth_header.split(' ')[1]
+        try:
+            token = Token.objects.get(key=token_key)
+            user = token.user
+        except Token.DoesNotExist:
+            return JsonResponse({'error': 'Invalid token'}, status=401)
+        
+        # Parse request data
+        data = json.loads(request.body)
+        amount = data.get('amount', 10000)  # Default to 10000 coins
+        
+        # Add coins
+        new_balance = user.add_coins(amount)
+        
+        return JsonResponse({
+            'message': f'Added {amount} coins successfully',
+            'coins': new_balance,
+            'amount_added': amount
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

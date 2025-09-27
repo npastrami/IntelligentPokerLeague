@@ -2,6 +2,7 @@ import { Disclosure, Menu } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon, UserCircleIcon } from '@heroicons/react/24/outline'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useState } from 'react'
 
 const navigation = [
   { name: 'Home', href: '/' },
@@ -23,7 +24,8 @@ function classNames(...classes) {
 export default function Navbar() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isAuthenticated, user, logout } = useAuth()
+  const { isAuthenticated, user, logout, updateUser } = useAuth()
+  const [addingCoins, setAddingCoins] = useState(false)
 
   const handleUserAction = async (item) => {
     if (item.action === 'logout') {
@@ -31,6 +33,35 @@ export default function Navbar() {
       navigate('/')
     } else {
       navigate(item.href)
+    }
+  }
+
+  const handleGetCoins = async () => {
+    setAddingCoins(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost:8000/api/users/add-coins/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount: 10000 })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update user context with new coin amount
+        updateUser({ ...user, coins: data.coins })
+        alert(`Added 10,000 coins! New balance: ${data.coins.toLocaleString()}`)
+      } else {
+        alert('Failed to add coins. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error adding coins:', error)
+      alert('Error adding coins. Please try again.')
+    } finally {
+      setAddingCoins(false)
     }
   }
 
@@ -79,7 +110,26 @@ export default function Navbar() {
               </div>
 
               <div className="hidden md:block">
-                <div className="ml-4 flex items-center md:ml-6">
+                <div className="ml-4 flex items-center md:ml-6 space-x-4">
+                  {isAuthenticated && (
+                    <>
+                      {/* Coins Display */}
+                      <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">
+                        💰 {user?.coins?.toLocaleString() || '0'} coins
+                      </div>
+                      
+                      {/* Get Coins Button */}
+                      <button
+                        onClick={handleGetCoins}
+                        disabled={addingCoins}
+                        className="bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400 rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
+                        style={{ pointerEvents: 'auto' }}
+                      >
+                        {addingCoins ? 'Adding...' : 'Get 10K Coins'}
+                      </button>
+                    </>
+                  )}
+
                   {isAuthenticated ? (
                     /* Profile dropdown */
                     <Menu as="div" className="relative ml-3 z-50">
@@ -96,6 +146,7 @@ export default function Navbar() {
                         <div className="px-4 py-2 border-b border-slate-200">
                           <p className="text-sm font-medium text-slate-900">{user?.first_name} {user?.last_name}</p>
                           <p className="text-xs text-slate-500">{user?.email}</p>
+                          <p className="text-xs text-green-600 font-semibold">💰 {user?.coins?.toLocaleString() || '0'} coins</p>
                         </div>
                         {userNavigation.map((item) => (
                           <Menu.Item key={item.name}>
@@ -153,6 +204,21 @@ export default function Navbar() {
 
           <Disclosure.Panel className="md:hidden relative z-40">
             <div className="space-y-1 px-2 pb-3 pt-2 sm:px-3 bg-white">
+              {isAuthenticated && (
+                <div className="mb-3 p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-slate-900">💰 {user?.coins?.toLocaleString() || '0'} coins</span>
+                  </div>
+                  <button
+                    onClick={handleGetCoins}
+                    disabled={addingCoins}
+                    className="w-full bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+                  >
+                    {addingCoins ? 'Adding...' : 'Get 10K Coins'}
+                  </button>
+                </div>
+              )}
+              
               {visibleNavigation.map((item) => (
                 <Link
                   key={item.name}
@@ -179,6 +245,7 @@ export default function Navbar() {
                   <div className="ml-3">
                     <div className="text-base font-medium text-slate-800">{user?.first_name} {user?.last_name}</div>
                     <div className="text-sm text-slate-500">{user?.email}</div>
+                    <div className="text-sm text-green-600 font-semibold">💰 {user?.coins?.toLocaleString() || '0'} coins</div>
                   </div>
                 </div>
                 <div className="mt-3 space-y-1 px-2">

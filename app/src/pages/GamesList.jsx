@@ -1,9 +1,18 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { PlusIcon, CpuChipIcon, CurrencyDollarIcon, HandRaisedIcon } from '@heroicons/react/24/outline'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { PlusIcon, CpuChipIcon, CurrencyDollarIcon, HandRaisedIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
 export default function GamesList() {
+  const navigate = useNavigate()
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showStartGameModal, setShowStartGameModal] = useState(false)
+  const [selectedGame, setSelectedGame] = useState(null)
+  const [gameMode, setGameMode] = useState('human')
+  const [selectedPlayerBot, setSelectedPlayerBot] = useState('')
+  const [userBots, setUserBots] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [availableGames, setAvailableGames] = useState([])
+  
   const [formData, setFormData] = useState({
     botName: '',
     bankroll: '',
@@ -11,39 +20,48 @@ export default function GamesList() {
     description: ''
   })
 
-  // Mock data for existing games
-  const availableGames = [
-    {
-      id: 1,
-      botName: "PokerPro3000",
-      player: "John Smith",
-      university: "MIT",
-      bankroll: 10000,
-      hands: 1000,
-      description: "Advanced GTO bot with neural network optimization",
-      status: "waiting"
-    },
-    {
-      id: 2,
-      botName: "BluffMaster",
-      player: "Sarah Chen",
-      university: "Stanford",
-      bankroll: 5000,
-      hands: 500,
-      description: "Aggressive bot specializing in bluff detection",
-      status: "waiting"
-    },
-    {
-      id: 3,
-      botName: "MathWiz",
-      player: "Mike Johnson",
-      university: "Caltech",
-      bankroll: 15000,
-      hands: 2000,
-      description: "Mathematical approach with probability calculations",
-      status: "in_game"
+  // Fetch available games on mount
+  useEffect(() => {
+    fetchAvailableGames()
+  }, [])
+
+  const fetchAvailableGames = async () => {
+    try {
+      const response = await fetch('/api/poker/available-games/')
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableGames(data.games || [])
+      }
+    } catch (error) {
+      console.error('Error fetching available games:', error)
     }
-  ]
+  }
+
+  const fetchUserBots = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/poker/get-user-bots/', {
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setUserBots(data.bots)
+      }
+    } catch (error) {
+      console.error('Error fetching user bots:', error)
+    }
+  }
+
+  // Fetch user's bots when modal opens
+  useEffect(() => {
+    if (showStartGameModal) {
+      fetchUserBots()
+    }
+  }, [showStartGameModal])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -52,9 +70,51 @@ export default function GamesList() {
     setFormData({ botName: '', bankroll: '', hands: '', description: '' })
   }
 
-  const handleChallenge = (gameId) => {
-    console.log('Challenging game:', gameId)
-    // TODO: Navigate to game or create match
+  const handleChallenge = (game) => {
+    setSelectedGame(game)
+    setShowStartGameModal(true)
+    setGameMode('human')
+    setSelectedPlayerBot('')
+  }
+
+  const handleStartGame = async () => {
+    if (!selectedGame) return
+
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const gameData = {
+        mode: gameMode,
+        opponent_bot_id: selectedGame.id,
+        ...(gameMode === 'bot' && { player_bot_id: selectedPlayerBot })
+      }
+
+      const response = await fetch('/api/poker/initialize-game/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(gameData)
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setShowStartGameModal(false)
+        
+        if (gameMode === 'human') {
+          navigate(`/game/human/${data.session_id}`)
+        } else {
+          navigate(`/game/bot/${data.session_id}`)
+        }
+      } else {
+        console.error('Failed to initialize game')
+      }
+    } catch (error) {
+      console.error('Error starting game:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -81,7 +141,7 @@ export default function GamesList() {
         {showCreateForm && (
           <div className="mb-8 rounded-lg bg-slate-800 p-6 shadow-lg border border-slate-700">
             <h2 className="text-xl font-semibold text-white mb-4">Post Your Bot</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-white mb-1">
@@ -141,20 +201,19 @@ export default function GamesList() {
               </div>
               <div className="flex space-x-3">
                 <button
-                  type="submit"
+                  onClick={handleSubmit}
                   className="rounded-md bg-gradient-to-r from-red-600 to-blue-600 px-4 py-2 text-sm font-medium text-white hover:from-red-500 hover:to-blue-500"
                 >
                   Post Bot
                 </button>
                 <button
-                  type="button"
                   onClick={() => setShowCreateForm(false)}
                   className="rounded-md bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-500"
                 >
                   Cancel
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         )}
 
@@ -187,35 +246,119 @@ export default function GamesList() {
 
               <p className="mt-3 text-sm text-slate-300">{game.description}</p>
 
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center text-sm text-slate-300">
-                  <CurrencyDollarIcon className="h-4 w-4 mr-2 text-green-400" />
-                  <span>Bankroll: {game.bankroll.toLocaleString()} credits</span>
-                </div>
-                <div className="flex items-center text-sm text-slate-300">
-                  <HandRaisedIcon className="h-4 w-4 mr-2 text-orange-400" />
-                  <span>Hands: {game.hands.toLocaleString()}</span>
-                </div>
-              </div>
-
               <div className="mt-6 flex space-x-3">
                 <button
-                  onClick={() => handleChallenge(game.id)}
+                  onClick={() => handleChallenge(game)}
                   disabled={game.status === 'in_game'}
                   className="flex-1 rounded-md bg-gradient-to-r from-red-600 to-blue-600 px-3 py-2 text-sm font-medium text-white hover:from-red-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {game.status === 'waiting' ? 'Challenge' : 'In Progress'}
                 </button>
-                <Link
-                  to={`/profile/${game.player.toLowerCase().replace(' ', '-')}`}
+                <button
+                  onClick={() => window.location.href = `/profile/${game.player.toLowerCase().replace(' ', '-')}`}
                   className="rounded-md bg-slate-600 px-3 py-2 text-sm font-medium text-white hover:bg-slate-500"
                 >
                   View Profile
-                </Link>
+                </button>
               </div>
             </div>
           ))}
         </div>
+
+        {/* Start Game Modal */}
+        {showStartGameModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-800 rounded-lg p-6 max-w-md w-full border border-slate-700">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-white">Start Game</h2>
+                <button
+                  onClick={() => setShowStartGameModal(false)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              {selectedGame && (
+                <div className="mb-6">
+                  <p className="text-slate-300 text-sm">Challenge: <span className="text-white font-medium">{selectedGame.botName}</span></p>
+                  <p className="text-slate-400 text-xs">by {selectedGame.player}</p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">
+                    Play Mode
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="human"
+                        checked={gameMode === 'human'}
+                        onChange={(e) => setGameMode(e.target.value)}
+                        className="mr-2"
+                      />
+                      <span className="text-slate-300">Play as Human</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="bot"
+                        checked={gameMode === 'bot'}
+                        onChange={(e) => setGameMode(e.target.value)}
+                        className="mr-2"
+                      />
+                      <span className="text-slate-300">Deploy Your Bot</span>
+                    </label>
+                  </div>
+                </div>
+
+                {gameMode === 'bot' && (
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">
+                      Select Your Bot
+                    </label>
+                    <select
+                      value={selectedPlayerBot}
+                      onChange={(e) => setSelectedPlayerBot(e.target.value)}
+                      className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Choose a bot...</option>
+                      {userBots.map((bot) => (
+                        <option key={bot.id} value={bot.id}>
+                          {bot.name}
+                        </option>
+                      ))}
+                    </select>
+                    {userBots.length === 0 && (
+                      <p className="text-slate-400 text-xs mt-1">
+                        No bots available. Create one first.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={handleStartGame}
+                    disabled={loading || (gameMode === 'bot' && !selectedPlayerBot)}
+                    className="flex-1 rounded-md bg-gradient-to-r from-red-600 to-blue-600 px-4 py-2 text-sm font-medium text-white hover:from-red-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? 'Starting...' : 'Start Game'}
+                  </button>
+                  <button
+                    onClick={() => setShowStartGameModal(false)}
+                    className="rounded-md bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-500"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Empty State */}
         {availableGames.length === 0 && (

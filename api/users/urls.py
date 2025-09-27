@@ -9,4 +9,5 @@ urlpatterns = [
     path('change-password/', views.change_password, name='change_password'),
     path('stats/', views.user_stats, name='user_stats'),
     path('verify/<str:token>/', views.verify_email, name='verify_email'),
+    path('add-coins/', views.add_coins, name='add_coins'),
 ]
