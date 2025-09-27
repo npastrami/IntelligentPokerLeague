@@ -185,6 +185,11 @@ class BotInterface:
             module_dir = os.path.dirname(module_path)
             if module_dir not in sys.path:
                 sys.path.insert(0, module_dir)
+            
+            # Add skeleton directory for bot imports
+            skeleton_dir = os.path.join(module_dir, 'skeleton')
+            if os.path.exists(skeleton_dir) and skeleton_dir not in sys.path:
+                sys.path.insert(0, skeleton_dir)
         
         # Load the module
         try:

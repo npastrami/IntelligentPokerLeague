@@ -13,6 +13,8 @@ from django.core.files.base import ContentFile
 from django.utils.decorators import method_decorator
 from django.contrib.auth import get_user_model
 from pathlib import Path
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 from .models import GameSession, BotRepository
 from .manager import PokerGameManager, BotInterface, start_bot_game, stop_bot_game, get_bot_game_status
@@ -27,13 +29,12 @@ def home_view(request):
 def game_table(request):
     return JsonResponse({'status': 'game_table_endpoint'})
 
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def initialize_game(request):
     """Initialize a new poker game session"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         game_mode = data.get('mode', 'human')  # 'human' or 'bot'
         
         # Get player
@@ -99,13 +100,12 @@ def initialize_game(request):
         logger.error(f"Error initializing game: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def join_game(request):
     """Join an existing game or start a new hand"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         session_id = data.get('session_id')
         
         if not session_id:
@@ -124,13 +124,12 @@ def join_game(request):
         logger.error(f"Error joining game: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def post_bot(request):
     """Post a new bot to the repository"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         
         bot_name = data.get('botName')
         description = data.get('description', '')
@@ -142,13 +141,13 @@ def post_bot(request):
         bot = BotRepository.objects.create(
             name=bot_name,
             description=description,
-            created_by=request.user,
-            is_public=True
+            user=request.user,
+            is_active=True
         )
         
         return JsonResponse({
             'message': 'Bot posted successfully',
-            'bot_id': bot.id
+            'bot_id': str(bot.id)
         })
         
     except Exception as e:
@@ -160,15 +159,15 @@ def get_available_games_api(request):
     """Get list of available games/bots"""
     try:
         # Get available bots
-        bots = BotRepository.objects.filter(is_public=True).select_related('created_by')
+        bots = BotRepository.objects.filter(is_active=True).select_related('user')
         
         games_data = []
         for bot in bots:
             games_data.append({
-                'id': bot.id,
+                'id': str(bot.id),
                 'botName': bot.name,
-                'player': f"{bot.created_by.first_name} {bot.created_by.last_name}",
-                'university': getattr(bot.created_by, 'university', 'Unknown'),
+                'player': f"{bot.user.first_name} {bot.user.last_name}",
+                'university': getattr(bot.user, 'university', 'Unknown'),
                 'description': bot.description,
                 'status': 'waiting'
             })
@@ -179,13 +178,12 @@ def get_available_games_api(request):
         logger.error(f"Error getting available games: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def make_move(request):
     """Process a player's move in the game"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         session_id = data.get('session_id')
         action_type = data.get('action_type')
         amount = data.get('amount', 0)
@@ -205,13 +203,12 @@ def make_move(request):
         logger.error(f"Error processing move: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def start_hand(request):
     """Start a new hand of poker"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         session_id = data.get('session_id')
         
         if not session_id:
@@ -230,13 +227,12 @@ def start_hand(request):
         logger.error(f"Error starting hand: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def buy_in(request):
     """Process buy-in for human vs bot games"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         session_id = data.get('session_id')
         
         if not session_id:
@@ -260,13 +256,12 @@ def buy_in(request):
         logger.error(f"Error processing buy-in: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def exit_game(request):
     """Exit the game and return remaining coins"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         session_id = data.get('session_id')
         
         if not session_id:
@@ -288,13 +283,12 @@ def exit_game(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 # Development environment views
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def save_code(request):
     """Save code to the development environment"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         filename = data.get('filename', 'player.py')
         code_content = data.get('content', '')
         
@@ -313,13 +307,12 @@ def save_code(request):
         logger.error(f"Error saving code: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def run_code(request):
     """Run user code in a sandbox environment"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         code_content = data.get('content', '')
         
         # This is a placeholder for code execution
@@ -378,13 +371,12 @@ def get_skeleton_file_content(request, path):
         return JsonResponse({'error': str(e)}, status=500)
 
 # Bot game simulation views
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def start_bot_game_simulation(request):
     """Start a bot vs bot game simulation"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         session_id = data.get('session_id')
         
         if not session_id:
@@ -408,13 +400,12 @@ def start_bot_game_simulation(request):
         logger.error(f"Error starting bot game simulation: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def pause_bot_game_simulation(request):
     """Pause a running bot game simulation"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         session_id = data.get('session_id')
         
         if not session_id:
@@ -434,8 +425,8 @@ def pause_bot_game_simulation(request):
         logger.error(f"Error pausing bot game simulation: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@require_GET
-@login_required
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_bot_game_progress(request):
     """Get progress of a bot game simulation"""
     try:
@@ -462,20 +453,20 @@ def get_bot_game_progress(request):
         logger.error(f"Error getting bot game progress: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@require_GET
-@login_required
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_user_bots(request):
     """Get bots created by the current user"""
     try:
-        bots = BotRepository.objects.filter(created_by=request.user)
+        bots = BotRepository.objects.filter(user=request.user, is_active=True)
         
         bots_data = []
         for bot in bots:
             bots_data.append({
-                'id': bot.id,
+                'id': str(bot.id),
                 'name': bot.name,
                 'description': bot.description,
-                'created_at': bot.created_at.isoformat() if hasattr(bot, 'created_at') else None
+                'created_at': bot.created_at.isoformat()
             })
         
         return JsonResponse({'bots': bots_data})
@@ -488,17 +479,17 @@ def get_user_bots(request):
 def get_available_opponent_bots(request):
     """Get available bots that can be used as opponents"""
     try:
-        # Get all public bots
-        bots = BotRepository.objects.filter(is_public=True).select_related('created_by')
+        # Get all active bots
+        bots = BotRepository.objects.filter(is_active=True).select_related('user')
         
         bots_data = []
         for bot in bots:
             bots_data.append({
-                'id': bot.id,
+                'id': str(bot.id),
                 'name': bot.name,
                 'description': bot.description,
-                'created_by': f"{bot.created_by.first_name} {bot.created_by.last_name}",
-                'created_at': bot.created_at.isoformat() if hasattr(bot, 'created_at') else None
+                'created_by': f"{bot.user.first_name} {bot.user.last_name}",
+                'created_at': bot.created_at.isoformat()
             })
         
         return JsonResponse({'bots': bots_data})
@@ -507,13 +498,12 @@ def get_available_opponent_bots(request):
         logger.error(f"Error getting opponent bots: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-@csrf_exempt
-@require_POST
-@login_required
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def start_bot_vs_bot_game(request):
     """Start a new bot vs bot game"""
     try:
-        data = json.loads(request.body)
+        data = request.data
         
         player_bot_id = data.get('player_bot_id')
         opponent_bot_id = data.get('opponent_bot_id')

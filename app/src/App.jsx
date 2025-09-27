@@ -10,6 +10,7 @@ import Leaderboard from './pages/Leaderboard'
 import Team from './pages/Team'
 import MonacoEditor from './pages/MonacoEditor'
 import Games from './pages/GamesList'
+import GameHuman from './pages/GameHuman' // Add this import
 
 function App() {
   return (
@@ -51,6 +52,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Games />
+                </ProtectedRoute>
+              } 
+            />
+            {/* Add this route */}
+            <Route 
+              path="/game/human/:sessionId" 
+              element={
+                <ProtectedRoute>
+                  <GameHuman />
                 </ProtectedRoute>
               } 
             />
