@@ -9,6 +9,7 @@ export default function GamesList() {
   const [selectedGame, setSelectedGame] = useState(null)
   const [gameMode, setGameMode] = useState('human')
   const [selectedPlayerBot, setSelectedPlayerBot] = useState('')
+  const [buyInAmount, setBuyInAmount] = useState('200')
   const [userBots, setUserBots] = useState([])
   const [loading, setLoading] = useState(false)
   const [availableGames, setAvailableGames] = useState([])
@@ -19,6 +20,16 @@ export default function GamesList() {
     hands: '',
     description: ''
   })
+
+  // Predefined buy-in amounts
+  const buyInOptions = [
+    { value: '100', label: '$100' },
+    { value: '200', label: '$200' },
+    { value: '500', label: '$500' },
+    { value: '1000', label: '$1,000' },
+    { value: '2000', label: '$2,000' },
+    { value: '5000', label: '$5,000' }
+  ]
 
   // Fetch available games on mount
   useEffect(() => {
@@ -75,6 +86,7 @@ export default function GamesList() {
     setShowStartGameModal(true)
     setGameMode('human')
     setSelectedPlayerBot('')
+    setBuyInAmount('200') // Reset to default
   }
 
   const handleStartGame = async () => {
@@ -86,6 +98,7 @@ export default function GamesList() {
       const gameData = {
         mode: gameMode,
         opponent_bot_id: selectedGame.id,
+        buy_in_amount: parseInt(buyInAmount),
         ...(gameMode === 'bot' && { player_bot_id: selectedPlayerBot })
       }
 
@@ -313,6 +326,30 @@ export default function GamesList() {
                       <span className="text-gray-300">Deploy Your Bot</span>
                     </label>
                   </div>
+                </div>
+
+                {/* Buy-in Amount Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">
+                    <CurrencyDollarIcon className="inline h-4 w-4 mr-1" />
+                    Buy-in Amount
+                  </label>
+                  <select
+                    value={buyInAmount}
+                    onChange={(e) => setBuyInAmount(e.target.value)}
+                    className="w-full rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-white focus:border-[#ff3131] focus:outline-none focus:ring-1 focus:ring-[#ff3131]"
+                  >
+                    {buyInOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-gray-400 text-xs mt-1">
+                    {gameMode === 'human' 
+                      ? 'Amount you will buy in with to play' 
+                      : 'Amount your bot will buy in with to play'}
+                  </p>
                 </div>
 
                 {gameMode === 'bot' && (
