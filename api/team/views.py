@@ -1,15 +1,17 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.db import IntegrityError
 import json
-
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
 from .models import Team, TeamMember, TeamInvitation
-
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 def team(request):
     """Frontend page for teams"""
@@ -86,24 +88,22 @@ def team_detail_api(request, team_id):
         }, status=500)
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication]) 
+@permission_classes([IsAuthenticated])
 def create_team_api(request):
     """Create a new team"""
     try:
         data = json.loads(request.body)
-        
-        # For demo purposes, assume user_id is passed in request
-        # In production, use request.user after proper authentication
-        user_id = data.get('user_id')
+        user_id = request.user.id
         if not user_id:
             return JsonResponse({
                 'success': False,
                 'error': 'user_id required'
             }, status=400)
-        
+
         user = get_object_or_404(User, id=user_id)
-        
+
         # Create team
         team = Team.objects.create(
             name=data['name'],

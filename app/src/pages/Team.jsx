@@ -1,51 +1,163 @@
 import { useState } from 'react'
-import { UserGroupIcon, PlusIcon, MagnifyingGlassIcon, LockClosedIcon, GlobeAltIcon } from '@heroicons/react/24/outline'
+import { UserGroupIcon, MagnifyingGlassIcon, LockClosedIcon, GlobeAltIcon } from '@heroicons/react/24/outline'
+
+const API_BASE = import.meta.env?.VITE_API_BASE ?? 'http://localhost:8000';
+
+function authFetch(path, options = {}) {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+    ...(token ? { Authorization: `Token ${token}` } : {}),
+  };
+  return fetch(`${API_BASE}${path}`, { ...options, headers });
+}
+
+
+/* ---------- Reusable confirm dialog ---------- */
+function ConfirmDialog({ open, title, message, confirmText = 'Leave team', onCancel, onConfirm }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* backdrop */}
+      <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
+      {/* modal */}
+      <div className="relative w-full max-w-md rounded-xl border border-gray-700 bg-[#1f1f24] p-6 shadow-2xl">
+        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <p className="mt-2 text-sm text-gray-300">{message}</p>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="rounded-md border border-gray-600 px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-black hover:bg-red-600"
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function Team() {
   const [activeTab, setActiveTab] = useState('myTeam')
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showJoinModal, setShowJoinModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  // API/UI state for creating a team
+  const [submitting, setSubmitting] = useState(false)
+  const [apiError, setApiError] = useState('')
+  const [apiSuccess, setApiSuccess] = useState('')
 
   const [teamForm, setTeamForm] = useState({
     name: '',
     description: '',
-    isPrivate: false
+    isPrivate: false,
   })
 
-  const currentTeam = {
-    name: "MIT Poker Warriors",
-    description: "Competitive poker bot development team from MIT",
+  // Use state so we can "leave" the team
+  const initialTeam = {
+    name: 'MIT Poker Warriors',
+    description: 'Competitive poker bot development team from MIT',
     members: [
-      { name: "John Smith", role: "Captain", university: "MIT", joined: "2024-01-15" },
-      { name: "Sarah Chen", role: "Developer", university: "MIT", joined: "2024-01-20" },
-      { name: "Mike Johnson", role: "Strategist", university: "MIT", joined: "2024-02-01" }
+      { name: 'John Smith', role: 'Captain', university: 'MIT', joined: '2024-01-15' },
+      { name: 'Sarah Chen', role: 'Developer', university: 'MIT', joined: '2024-01-20' },
+      { name: 'Mike Johnson', role: 'Strategist', university: 'MIT', joined: '2024-02-01' },
     ],
     isPrivate: false,
-    created: "2024-01-15"
+    created: '2024-01-15',
   }
+
+  const [team, setTeam] = useState(initialTeam)
 
   const availableTeams = [
-    { id: 1, name: "Stanford Sharks", members: 8, university: "Stanford", isPrivate: false, description: "Advanced AI poker bots" },
-    { id: 2, name: "Berkeley Bears", members: 5, university: "Berkeley", isPrivate: true, description: "Machine learning poker strategies" },
-    { id: 3, name: "Caltech Coders", members: 11, university: "Caltech", isPrivate: false, description: "Mathematical approach to poker" },
-    { id: 4, name: "CMU Cyborgs", members: 7, university: "CMU", isPrivate: false, description: "Hybrid human-AI poker team" }
+    { id: 1, name: 'Stanford Sharks', members: 8, university: 'Stanford', isPrivate: false, description: 'Advanced AI poker bots' },
+    { id: 2, name: 'Berkeley Bears', members: 5, university: 'Berkeley', isPrivate: true, description: 'Machine learning poker strategies' },
+    { id: 3, name: 'Caltech Coders', members: 11, university: 'Caltech', isPrivate: false, description: 'Mathematical approach to poker' },
+    { id: 4, name: 'CMU Cyborgs', members: 7, university: 'CMU', isPrivate: false, description: 'Hybrid human-AI poker team' },
   ]
 
-  const handleCreateTeam = () => {
-    console.log('Creating team:', teamForm)
-    setShowCreateModal(false)
-    setTeamForm({ name: '', description: '', isPrivate: false })
-  }
+  const handleCreateTeam = async (e) => {
+    e?.preventDefault?.();
+    setApiError('');
+    setApiSuccess('');
+    setSubmitting(true);
+
+    try {
+      const payload = {
+        name: teamForm.name,
+        description: teamForm.description,
+        is_private: teamForm.isPrivate,
+      };
+
+      const res = await authFetch('/api/teams/api/create/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      // read body ONCE (avoid the "body stream already read" error)
+      const raw = await res.text();
+      const data = raw ? JSON.parse(raw) : {};
+
+      if (!res.ok) {
+        const detail =
+          data?.detail ||
+          data?.error ||
+          (raw || `Request failed with ${res.status}`);
+        throw new Error(detail);
+      }
+
+      // Normalize into your UI shape
+      const createdTeam = {
+        name: data.team?.name ?? data.name ?? teamForm.name,
+        description: data.team?.description ?? data.description ?? teamForm.description,
+        isPrivate:
+          typeof (data.team?.is_private ?? data.is_private) === 'boolean'
+            ? (data.team?.is_private ?? data.is_private)
+            : teamForm.isPrivate,
+        created:
+          data.team?.created_at?.slice(0, 10) ??
+          data.created ??
+          new Date().toISOString().slice(0, 10),
+        members: data.team?.members ?? [],
+      };
+
+      setTeam(createdTeam);
+      setTeamForm({ name: '', description: '', isPrivate: false });
+      setApiSuccess('Team created successfully!');
+      setActiveTab('myTeam');
+    } catch (err) {
+      setApiError(err?.message || 'Failed to create team');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
 
   const handleJoinTeam = (teamId) => {
     console.log('Joining team:', teamId)
-    setShowJoinModal(false)
+    // Implement your JOIN POST here similarly if needed
   }
 
-  const filteredTeams = availableTeams.filter(team =>
-    team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    team.university.toLowerCase().includes(searchQuery.toLowerCase())
+  // open the confirm modal
+  const handleLeaveTeamClick = () => setConfirmOpen(true)
+
+  // actually leave after confirm
+  const handleLeaveTeamConfirm = () => {
+    setConfirmOpen(false)
+    // TODO: call your API to leave
+    setTeam(null) // Clear local state
+  }
+
+  const filteredTeams = availableTeams.filter((t) =>
+    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.university.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   return (
@@ -56,6 +168,18 @@ export default function Team() {
           <p className="mt-2 text-gray-300">Collaborate with fellow poker enthusiasts</p>
         </div>
 
+        {/* Status banners */}
+        {apiSuccess && (
+          <div className="mb-4 rounded-md border border-green-700 bg-green-900/40 px-4 py-3 text-green-200">
+            {apiSuccess}
+          </div>
+        )}
+        {apiError && (
+          <div className="mb-4 rounded-md border border-red-700 bg-red-900/40 px-4 py-3 text-red-200">
+            {apiError}
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="mb-8">
           <div className="border-b border-gray-700">
@@ -63,7 +187,7 @@ export default function Team() {
               {[
                 { key: 'myTeam', name: 'My Team' },
                 { key: 'browse', name: 'Browse Teams' },
-                { key: 'create', name: 'Create Team' }
+                { key: 'create', name: 'Create Team' },
               ].map(({ key, name }) => (
                 <button
                   key={key}
@@ -84,27 +208,38 @@ export default function Team() {
         {/* My Team Tab */}
         {activeTab === 'myTeam' && (
           <div className="space-y-6">
-            {currentTeam ? (
+            {team ? (
               <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h2 className="text-xl font-semibold text-white">{currentTeam.name}</h2>
-                    <p className="text-gray-300 mt-1">{currentTeam.description}</p>
+                    <h2 className="text-xl font-semibold text-white">{team.name}</h2>
+                    <p className="text-gray-300 mt-1">{team.description}</p>
                     <div className="flex items-center mt-2 text-sm text-gray-400">
-                      {currentTeam.isPrivate ? (
+                      {team.isPrivate ? (
                         <LockClosedIcon className="h-4 w-4 mr-1" />
                       ) : (
                         <GlobeAltIcon className="h-4 w-4 mr-1" />
                       )}
-                      {currentTeam.isPrivate ? 'Private' : 'Public'} • Created {currentTeam.created}
+                      {team.isPrivate ? 'Private' : 'Public'} • Created {team.created}
                     </div>
                   </div>
+
+                  {/* Leave Team button */}
+                  <button
+                    onClick={handleLeaveTeamClick}
+                    className="inline-flex items-center px-3 py-1.5 rounded-md bg-[#ff3131] text-black text-sm font-medium
+                               hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-[#19191E]"
+                  >
+                    Leave Team
+                  </button>
                 </div>
 
                 <div className="mt-6">
-                  <h3 className="text-lg font-medium text-white mb-3">Team Members ({currentTeam.members.length}/11)</h3>
+                  <h3 className="text-lg font-medium text-white mb-3">
+                    Team Members ({team.members?.length ?? 0}/11)
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {currentTeam.members.map((member, i) => (
+                    {(team.members ?? []).map((member, i) => (
                       <div key={i} className="bg-gray-700 rounded-lg p-4">
                         <div className="flex items-center">
                           <div className="bg-[#ff3131] rounded-full w-10 h-10 flex items-center justify-center text-black font-semibold">
@@ -148,33 +283,33 @@ export default function Team() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTeams.map((team) => (
-                <div key={team.id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              {filteredTeams.map((t) => (
+                <div key={t.id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="text-lg font-semibold text-white">{team.name}</h3>
-                      <p className="text-sm text-gray-300">{team.university}</p>
+                      <h3 className="text-lg font-semibold text-white">{t.name}</h3>
+                      <p className="text-sm text-gray-300">{t.university}</p>
                     </div>
                     <div className="flex items-center text-xs text-gray-400">
-                      {team.isPrivate ? (
+                      {t.isPrivate ? (
                         <LockClosedIcon className="h-4 w-4 mr-1" />
                       ) : (
                         <GlobeAltIcon className="h-4 w-4 mr-1" />
                       )}
-                      {team.isPrivate ? 'Private' : 'Public'}
+                      {t.isPrivate ? 'Private' : 'Public'}
                     </div>
                   </div>
-                  
-                  <p className="text-sm text-gray-300 mb-4">{team.description}</p>
-                  
+
+                  <p className="text-sm text-gray-300 mb-4">{t.description}</p>
+
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">{team.members}/11 members</span>
+                    <span className="text-sm text-gray-400">{t.members}/11 members</span>
                     <button
-                      onClick={() => handleJoinTeam(team.id)}
-                      disabled={team.members >= 11}
+                      onClick={() => handleJoinTeam(t.id)}
+                      disabled={t.members >= 11}
                       className="px-3 py-1 bg-[#ff3131] text-black text-sm rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {team.members >= 11 ? 'Full' : 'Join'}
+                      {t.members >= 11 ? 'Full' : 'Join'}
                     </button>
                   </div>
                 </div>
@@ -188,15 +323,15 @@ export default function Team() {
           <div className="max-w-2xl mx-auto">
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h2 className="text-xl font-semibold text-white mb-6">Create New Team</h2>
-              
-              <form onSubmit={(e) => { e.preventDefault(); handleCreateTeam(); }} className="space-y-4">
+
+              <form onSubmit={handleCreateTeam} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-white mb-1">Team Name</label>
                   <input
                     type="text"
                     required
                     value={teamForm.name}
-                    onChange={(e) => setTeamForm(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => setTeamForm((prev) => ({ ...prev, name: e.target.value }))}
                     className="w-full rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-[#ff3131] focus:outline-none focus:ring-1 focus:ring-[#ff3131]"
                     placeholder="Enter team name"
                   />
@@ -207,7 +342,7 @@ export default function Team() {
                   <textarea
                     rows={3}
                     value={teamForm.description}
-                    onChange={(e) => setTeamForm(prev => ({ ...prev, description: e.target.value }))}
+                    onChange={(e) => setTeamForm((prev) => ({ ...prev, description: e.target.value }))}
                     className="w-full rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-[#ff3131] focus:outline-none focus:ring-1 focus:ring-[#ff3131]"
                     placeholder="Describe your team's goals and strategy"
                   />
@@ -218,7 +353,7 @@ export default function Team() {
                     type="checkbox"
                     id="private"
                     checked={teamForm.isPrivate}
-                    onChange={(e) => setTeamForm(prev => ({ ...prev, isPrivate: e.target.checked }))}
+                    onChange={(e) => setTeamForm((prev) => ({ ...prev, isPrivate: e.target.checked }))}
                     className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-[#ff3131] focus:ring-[#ff3131]"
                   />
                   <label htmlFor="private" className="ml-2 text-sm text-white">
@@ -228,15 +363,26 @@ export default function Team() {
 
                 <button
                   type="submit"
-                  className="w-full rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-black hover:bg-red-600"
+                  disabled={submitting}
+                  className="w-full rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-black hover:bg-red-600 disabled:opacity-60"
                 >
-                  Create Team
+                  {submitting ? 'Creating…' : 'Create Team'}
                 </button>
               </form>
             </div>
           </div>
         )}
       </div>
+
+      {/* Confirm modal */}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Leave this team?"
+        message="You’ll be removed from MIT Poker Warriors. You can rejoin later if it’s public or if you’re invited."
+        confirmText="Yes, leave team"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={handleLeaveTeamConfirm}
+      />
     </div>
   )
 }
