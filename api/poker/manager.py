@@ -573,7 +573,23 @@ class PokerGameManager:
         except Exception as e:
             logger.error(f"Error writing player B log: {str(e)}")
 
-    # ... (rest of the methods remain unchanged)
+    def _get_current_bet_info(self, round_state):
+        """Get current betting information for the frontend"""
+        if isinstance(round_state, TerminalState):
+            return 0, 0
+        
+        # Get the current pip amounts
+        player_pip = round_state.pips[0]  # What player has put in this street
+        bot_pip = round_state.pips[1]     # What bot has put in this street
+        
+        # Current bet is the higher of the two pips
+        current_bet = max(player_pip, bot_pip)
+        
+        # Amount player needs to call is the difference
+        call_amount = current_bet - player_pip
+        
+        return current_bet, call_amount
+
     def start_new_hand(self, continue_session=False):
         """Initialize a new hand of poker"""
         logger.info(f"Starting new hand. Continue session: {continue_session}")
@@ -666,8 +682,15 @@ class PokerGameManager:
         self.session.game_state = self._serialize_game_state(round_state)
         self.session.save()
         
-        # Determine first to act based on street and button position
-        is_player_turn = button == 0 and round_state.street > 0 or button == 1 and round_state.street == 0
+        # FIXED: Correct turn determination
+        # In the engine, button tracks turn order and active = button % 2
+        # Player is index 0, bot is index 1
+        is_player_turn = (round_state.button % 2) == 0
+        current_player = 'player' if is_player_turn else 'bot'
+        
+        logger.info(f"Button position: {round_state.button}")
+        logger.info(f"Is player turn: {is_player_turn}")
+        logger.info(f"Current player: {current_player}")
 
         # In bot vs bot mode, we show both player bots' cards
         player_cards_display = self.convert_cards_to_display(player_cards)
@@ -678,6 +701,9 @@ class PokerGameManager:
         else:
             game_message = 'Your turn!' if is_player_turn else 'Waiting for bot...'
 
+        # Get betting information
+        current_bet, call_amount = self._get_current_bet_info(round_state)
+
         return {
             'requires_buy_in': False,
             'pot': self.session.pot,
@@ -686,25 +712,31 @@ class PokerGameManager:
             'player_cards': player_cards_display,
             'bot_cards': self.convert_cards_to_display(bot_cards) if self.is_bot_vs_bot else [],
             'board_cards': [],
+            'current_bet': current_bet,
+            'call_amount': call_amount,
+            'player_current_bet': round_state.pips[0],
             'legal_actions': [] if self.is_bot_vs_bot else self._get_legal_actions(round_state) if is_player_turn else [],
             'game_message': game_message,
             'is_bot_vs_bot': self.is_bot_vs_bot,
+            'current_player': current_player,
             'is_player_turn': is_player_turn
         }
 
     def process_player_action(self, action_type, amount=0):
         """Process a player's action and get the bot's response"""
-        logger.info(f"Processing player action: {action_type}, amount: {amount}")
+        print(f"\n=== STARTING PLAYER ACTION ===")
+        print(f"Action: {action_type}, Amount: {amount}")
         
         # Import action types to ensure they're available
         from .engine import FoldAction, CallAction, CheckAction, RaiseAction
         
         round_state = self._deserialize_game_state(self.session.game_state)
-        logger.info(f"Round state: {round_state}")
-        logger.info(f"Initial state - Pot: {self.session.pot}, Player Stack: {self.session.player_stack}, Bot Stack: {self.session.bot_stack}")
+        print(f"Round state street: {round_state.street if round_state else 'None'}")
+        print(f"Round state button: {round_state.button if round_state else 'None'}")
+        print(f"Round state pips: {round_state.pips if round_state else 'None'}")
         
         if round_state is None:  # Terminal state
-            logger.info("Terminal state detected at start")
+            print("Terminal state detected at start")
             return self._create_terminal_response()
         
         # Store current state for tracking changes
@@ -715,13 +747,14 @@ class PokerGameManager:
             'pips': round_state.pips.copy() if hasattr(round_state, 'pips') else [0, 0],
             'street': round_state.street if hasattr(round_state, 'street') else 0
         }
+        print(f"Initial state: {initial_state}")
         
         # In bot vs bot mode, get player bot's action instead of using the provided action
         if self.is_bot_vs_bot and self.player_bot:
-            logger.info("Getting action from player bot")
+            print("Getting action from player bot")
             bot_action = self.player_bot.get_action(None, round_state, 0)
             action_name = self._action_to_string(bot_action)
-            logger.info(f"Player bot action: {action_name}")
+            print(f"Player bot action: {action_name}")
             
             # Update action_type and amount based on bot's action
             action_type = self._convert_action_to_string(type(bot_action))
@@ -733,70 +766,66 @@ class PokerGameManager:
         else:
             # Human player's action
             action = self._create_action(action_type, amount, round_state)
+            print(f"Human player action: {self._action_to_string(action)}")
         
         # Log the player action
         bet_override = (round_state.pips == [0, 0])
         self.log_action(0, action, bet_override)
         
         # Apply the action to advance the game state
+        print(f"\n=== APPLYING PLAYER ACTION ===")
+        print(f"Before proceed - Street: {round_state.street}, Pips: {round_state.pips}")
         next_state = round_state.proceed(action)
+        print(f"After proceed - Next state type: {type(next_state).__name__}")
         
-        # Handle player fold
-        if isinstance(action, FoldAction):
-            # When player folds, only add matched bets to the pot
-            matched_amount = min(initial_state['pips'])
-            self.total_pot += matched_amount * 2
-            current_pot = self.total_pot
-            # Return excess chips to bot (the difference between their pip and the matched amount)
-            bot_return = initial_state['pips'][1] - matched_amount if initial_state['pips'][1] > matched_amount else 0
-            player_return = 0  # Player folded, they don't get anything back
-        elif isinstance(action, CallAction):
-            # Only add to pot if we're not just completing blinds
-            if initial_state['pips'] != [1, 2] and initial_state['pips'] != [2, 1]:
-                # Calculate how much more player needs to put in
-                player_current = initial_state['pips'][0]  # What player has in already
-                to_match = initial_state['pips'][1]        # What they need to match
-                call_amount = to_match - player_current    # How much more they need to add
-                
-                if call_amount > 0:
-                    self.total_pot += call_amount  # Just add the new chips
-                    current_pot = self.total_pot
+        if not isinstance(next_state, TerminalState):
+            print(f"After proceed - Street: {next_state.street}, Pips: {next_state.pips}")
+            print(f"After proceed - Button: {next_state.button}")
+            
+            # Check if street changed
+            if hasattr(next_state, 'street') and initial_state['street'] != next_state.street:
+                print(f"*** STREET CHANGED from {initial_state['street']} to {next_state.street} ***")
+                print(f"Board cards: {next_state.deck[:next_state.street] if next_state.street > 0 else 'None'}")
         else:
-            # Track pips for current street
-            current_street_pips = sum(initial_state['pips'])
-            current_round_pips = sum(next_state.pips) if not isinstance(next_state, TerminalState) else 0
-            
-            # Handle pot calculation after player action
-            if isinstance(next_state, TerminalState):
-                self.total_pot += current_street_pips
-                current_pot = self.total_pot
-            else:
-                if hasattr(next_state, 'street') and next_state.street > initial_state['street']:
-                    self.total_pot += current_street_pips
-                    current_pot = self.total_pot
-                else:
-                    current_pot = self.total_pot + current_round_pips
-            
-            bot_return = 0
-            player_return = 0
-                
+            print("Next state is TERMINAL")
+        
         # Handle bot response - use opponent_bot if in bot vs bot mode, otherwise use simple_bot
         bot_action_msg = ""
         if not isinstance(next_state, TerminalState):
+            print(f"\n=== BOT RESPONSE PHASE ===")
+            print(f"Turn calc - Button: {next_state.button}, Button % 2: {next_state.button % 2}")
+            
             dummy_game_state = None
             
             # Choose which bot to use for the opponent
             bot_to_use = self.opponent_bot if self.is_bot_vs_bot else self.simple_bot
-            logger.info(f"Getting action from opponent bot")
+            print(f"Using bot: {type(bot_to_use.bot_instance).__name__}")
+            if hasattr(self.session, 'opponent_bot') and self.session.opponent_bot:
+                print(f"Opponent bot name: {self.session.opponent_bot.name}")
+            else:
+                print("Using default SimpleBot")
+            
+            print(f"Getting action from opponent bot")
             bot_action = bot_to_use.get_action(dummy_game_state, next_state, 1)
-            logger.info(f"Opponent bot action: {self._action_to_string(bot_action)}")
+            print(f"Opponent bot action: {self._action_to_string(bot_action)}")
             
             # Log the bot action
             self.log_action(1, bot_action, False)
             
             previous_state = next_state
+            print(f"Before bot proceed - Street: {previous_state.street}, Pips: {previous_state.pips}")
             next_state = next_state.proceed(bot_action)
-            logger.info(f"After bot action - Next state: {next_state}")
+            print(f"After bot proceed - Next state type: {type(next_state).__name__}")
+            
+            if not isinstance(next_state, TerminalState):
+                print(f"After bot proceed - Street: {next_state.street}, Pips: {next_state.pips}")
+                print(f"After bot proceed - Button: {next_state.button}")
+                
+                # Check if street changed after bot action
+                if hasattr(next_state, 'street') and previous_state.street != next_state.street:
+                    print(f"*** STREET CHANGED AFTER BOT from {previous_state.street} to {next_state.street} ***")
+            else:
+                print("Next state is TERMINAL after bot action")
             
             # Create appropriate message based on game mode
             if self.is_bot_vs_bot:
@@ -804,110 +833,53 @@ class PokerGameManager:
                 bot_action_msg = f"{bot_name} {self._action_to_string(bot_action)}"
             else:
                 bot_action_msg = f"Bot {self._action_to_string(bot_action)}"
-            
-            # Handle bot fold
-            if isinstance(bot_action, FoldAction):
-                # When bot folds, winner gets only the matched bet plus existing pot
-                current_pips = previous_state.pips
-                player_return = current_pips[0]  # Return the full bet to player since bot folded
-                bot_return = 0  # Bot folded, they don't get anything back
-                # Do not modify total_pot since the bot folded and chips go back to player
-                logger.info(f"Bot fold - Player return: {player_return}")
-            elif isinstance(bot_action, CallAction):
-                # Get the amount bot has to call from the previous state
-                previous_pips = previous_state.pips
-                call_amount = previous_pips[0] - previous_pips[1]  # Amount bot needs to match
-                if call_amount > 0:
-                    self.total_pot += call_amount  # Add bot's call to pot
-                current_pot = self.total_pot
-                logger.info(f"Bot called {call_amount}, adding to pot, total: {current_pot}")
-            elif isinstance(next_state, TerminalState):
-                final_street_pips = sum(previous_state.pips)
-                self.total_pot += final_street_pips
-                current_pot = self.total_pot
-            else:
-                if hasattr(next_state, 'street') and next_state.street > previous_state.street:
-                    street_end_pips = sum(previous_state.pips)
-                    self.total_pot += street_end_pips
-                    logger.info(f"Street advanced after bot action, added {street_end_pips} to pot")
-                
-                current_pot = self.total_pot + sum(next_state.pips)
         else:
             bot_action_msg = "Hand complete!"
-            logger.info("Hand complete after player action")
+            print("Hand complete after player action")
         
-        # Update stacks and pot based on final state
-        if isinstance(next_state, TerminalState):
-            if hasattr(next_state, 'deltas'):
-                logger.info(f"Terminal state - Final pot: {self.total_pot}, Deltas: {next_state.deltas}")
-                
-                # Handle player fold
-                if isinstance(action, FoldAction):
-                    # If player folds, bot gets the pot
-                    win_amount = self.session.pot
-                    final_player_stack = initial_state['player_stack']  # Player gets nothing back
-                    final_bot_stack = initial_state['bot_stack'] + win_amount  # Bot gets the pot
-                    winner = "Bot"
-                    logger.info(f"Player folded, bot wins {win_amount}")
-                # Handle bot fold - bot_action will be defined in this case since we went through the bot response block
-                elif 'bot_action' in locals() and isinstance(bot_action, FoldAction):
-                    # If bot folds, player gets the pot and their unmatched raise back
-                    win_amount = self.session.pot
-                    final_player_stack = initial_state['player_stack'] + win_amount
-                    final_bot_stack = initial_state['bot_stack']  # Bot gets nothing back
-                    winner = "Player"
-                    logger.info(f"Bot folded, player wins {win_amount}")
-                # Handle normal win/loss (no fold)
-                else:
-                    if next_state.deltas[0] > 0:  # Player wins
-                        win_amount = self.total_pot
-                        final_player_stack = initial_state['player_stack'] + win_amount
-                        final_bot_stack = initial_state['bot_stack']  # Bot gets nothing on loss
-                        winner = "Player"
-                        logger.info(f"Player wins {win_amount} at showdown")
-                    elif next_state.deltas[0] < 0:  # Bot wins
-                        win_amount = self.total_pot
-                        final_player_stack = initial_state['player_stack']  # Player gets nothing on loss
-                        final_bot_stack = initial_state['bot_stack'] + win_amount
-                        winner = "Bot"
-                        logger.info(f"Bot wins {win_amount} at showdown")
-                    else:  # Split pot
-                        win_amount = self.total_pot // 2
-                        final_player_stack = initial_state['player_stack'] + win_amount
-                        final_bot_stack = initial_state['bot_stack'] + win_amount
-                        winner = "Split"
-                        logger.info(f"Split pot, each player gets {win_amount}")
-                
-                logger.info(f"Final stacks - Player: {final_player_stack}, Bot: {final_bot_stack}")
-                
-                self.session.player_stack = final_player_stack
-                self.session.bot_stack = final_bot_stack
-                self.session.pot = self.total_pot  # Keep final pot for display
-                
-                # Log terminal state
-                self.log_terminal_state(next_state)
-                
-                # Update hands played count for bot vs bot mode
-                if self.is_bot_vs_bot:
-                    self.session.hands_played = self.session.hands_played + 1
-                    logger.info(f"Bot vs Bot game: Hand {self.session.hands_played} of {self.session.hands_to_play} completed")
-                    # Check if game is complete
-                    if self.session.hands_played >= self.session.hands_to_play:
-                        logger.info(f"Bot vs Bot game completed: final score - Player: {final_player_stack}, Bot: {final_bot_stack}")
-                        # Save logs at end of game
-                        self.save_logs()
-        else:
-            # Update stacks and pot for ongoing hand
-            logger.info(f"Updating session stacks - Player: {next_state.stacks[0]}, Bot: {next_state.stacks[1]}")
-            self.session.player_stack = next_state.stacks[0]
-            self.session.bot_stack = next_state.stacks[1]
-            self.session.pot = current_pot
-            
-            # Log round state if street has changed
-            if hasattr(next_state, 'street') and initial_state['street'] != next_state.street:
-                self.log_round_state(next_state)
+        # Update session from round state
+        print(f"\n=== UPDATING SESSION ===")
+        old_cards = self.session.player_cards.copy() if self.session.player_cards else []
+        old_board = self.session.board_cards.copy() if self.session.board_cards else []
         
         self._update_session_from_round_state(next_state)
+        
+        print(f"Old player cards: {old_cards}")
+        print(f"New player cards: {self.session.player_cards}")
+        print(f"Old board cards: {old_board}")
+        print(f"New board cards: {self.session.board_cards}")
+        
+        # FIXED: Determine whose turn it is next
+        if isinstance(next_state, TerminalState):
+            is_player_turn = False  # No one's turn, hand is complete
+            current_player = None
+            print("Terminal state - no player turn")
+        else:
+            # Correct turn logic for heads-up poker
+            if next_state.street == 0:  # Preflop
+                # Preflop: button (small blind) acts first
+                is_player_turn = (next_state.button % 2) == 0
+            else:  # Post-flop
+                # Post-flop: non-button acts first (opposite of button)
+                is_player_turn = (next_state.button % 2) != 0
+            
+            current_player = 'player' if is_player_turn else 'bot'
+            print(f"\n=== TURN DETERMINATION ===")
+            print(f"Street: {next_state.street} ({'preflop' if next_state.street == 0 else 'post-flop'})")
+            print(f"Button: {next_state.button}, Button % 2: {next_state.button % 2}")
+            print(f"Is player turn: {is_player_turn}, Current player: {current_player}")
+        
+        # Get betting information for ongoing hands
+        if not isinstance(next_state, TerminalState):
+            current_bet, call_amount = self._get_current_bet_info(next_state)
+            print(f"Betting info - Current bet: {current_bet}, Call amount: {call_amount}")
+        else:
+            current_bet, call_amount = 0, 0
+        
+        print(f"\n=== RESPONSE PREPARATION ===")
+        print(f"Hand complete: {isinstance(next_state, TerminalState)}")
+        print(f"Is player turn: {is_player_turn}")
+        print(f"Final street: {getattr(next_state, 'street', 'terminal')}")
         
         # Prepare response data
         response_data = {
@@ -916,21 +888,21 @@ class PokerGameManager:
             'bot_stack': self.session.bot_stack,
             'player_cards': self.convert_cards_to_display(self.session.player_cards),
             'board_cards': self.convert_cards_to_display(self.session.board_cards),
-            'legal_actions': [] if self.is_bot_vs_bot else self._get_legal_actions(next_state) if not isinstance(next_state, TerminalState) else [],
+            'current_bet': current_bet,
+            'call_amount': call_amount,
+            'player_current_bet': next_state.pips[0] if not isinstance(next_state, TerminalState) else 0,
+            'legal_actions': [] if self.is_bot_vs_bot else self._get_legal_actions(next_state) if is_player_turn else [],
             'hand_complete': isinstance(next_state, TerminalState),
             'game_message': self._get_game_message(next_state, bot_action_msg),
             'is_bot_vs_bot': self.is_bot_vs_bot,
+            'current_player': current_player,
+            'is_player_turn': is_player_turn,
             'hands_played': self.session.hands_played if self.is_bot_vs_bot else 0,
             'hands_to_play': self.session.hands_to_play if self.is_bot_vs_bot else 0,
             'game_complete': self.session.hands_played >= self.session.hands_to_play if self.is_bot_vs_bot else False
         }
         
-        # Reset pot tracking only after response is prepared
-        if isinstance(next_state, TerminalState):
-            logger.info(f"Resetting pot for next hand from {self.session.pot} to 0")
-            self.session.pot = 0
-            self.total_pot = 0
-            self.session.save()
+        print(f"=== END PLAYER ACTION ===\n")
         
         return response_data
     
@@ -1156,10 +1128,15 @@ class PokerGameManager:
             'bot_stack': self.session.bot_stack,
             'player_cards': self.convert_cards_to_display(self.session.player_cards),
             'board_cards': self.convert_cards_to_display(self.session.board_cards),
+            'current_bet': 0,
+            'call_amount': 0,
+            'player_current_bet': 0,
             'legal_actions': [],
             'hand_complete': True,
             'game_message': "Hand complete! Click 'Next Hand' to continue.",
             'is_bot_vs_bot': self.is_bot_vs_bot,
+            'current_player': None,
+            'is_player_turn': False,
             'hands_played': self.session.hands_played if self.is_bot_vs_bot else 0,
             'hands_to_play': self.session.hands_to_play if self.is_bot_vs_bot else 0,
             'game_complete': self.session.hands_played >= self.session.hands_to_play if self.is_bot_vs_bot else False

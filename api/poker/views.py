@@ -36,6 +36,7 @@ def initialize_game(request):
     try:
         data = request.data
         game_mode = data.get('mode', 'human')  # 'human' or 'bot'
+        buy_in_amount = data.get('buy_in_amount', 200)  # Default to 200 if not provided
         
         # Get player
         player = request.user
@@ -63,8 +64,8 @@ def initialize_game(request):
                 player_bot=player_bot,
                 opponent_bot=opponent_bot,
                 hands_to_play=hands_to_play,
-                player_stack=200,
-                bot_stack=200,
+                player_stack=buy_in_amount,  # Use buy_in_amount
+                bot_stack=buy_in_amount,     # Use buy_in_amount
                 current_coins=0
             )
         else:
@@ -78,6 +79,10 @@ def initialize_game(request):
                 except BotRepository.DoesNotExist:
                     pass
             
+            # Check if player has enough coins for buy-in
+            if player.coins < buy_in_amount:
+                return JsonResponse({'error': f'Insufficient coins. You need {buy_in_amount} but have {player.coins}'}, status=400)
+            
             # Create session for human vs bot
             session = GameSession.objects.create(
                 session_id=str(uuid.uuid4()),
@@ -85,14 +90,19 @@ def initialize_game(request):
                 play_mode='human',
                 opponent_bot=opponent_bot,
                 hands_to_play=1,  # Ongoing for human games
-                player_stack=200,
-                bot_stack=200,
-                current_coins=0
+                player_stack=buy_in_amount,  # Use buy_in_amount
+                bot_stack=buy_in_amount,     # Use buy_in_amount
+                current_coins=buy_in_amount  # Track coins used
             )
+            
+            # Deduct coins from player for buy-in
+            player.coins -= buy_in_amount
+            player.save()
         
         return JsonResponse({
             'session_id': session.session_id,
             'mode': game_mode,
+            'buy_in_amount': buy_in_amount,
             'message': 'Game initialized successfully'
         })
         

@@ -139,14 +139,28 @@ export default function GameHuman({ sessionId }) {
       return <div className="w-12 h-16 bg-gray-600 rounded border border-gray-500"></div>
     }
 
-    const suit = card.slice(-1)
-    const rank = card.slice(0, -1)
-    const isRed = suit === 'h' || suit === 'd'
+    let value, suit, isRed;
+
+    // Handle both string format ("Ah") and object format ({value: "A", suit: "hearts", suit_symbol: "♥"})
+    if (typeof card === 'string') {
+      // Old string format
+      value = card.slice(0, -1);
+      suit = card.slice(-1);
+      isRed = suit === 'h' || suit === 'd';
+    } else if (typeof card === 'object') {
+      // New object format
+      value = card.value;
+      suit = card.suit_symbol || card.suit;
+      isRed = card.suit === 'hearts' || card.suit === 'diamonds';
+    } else {
+      // Fallback for unexpected format
+      return <div className="w-12 h-16 bg-gray-600 rounded border border-gray-500"></div>
+    }
     
     return (
       <div className="w-12 h-16 bg-white rounded border-2 border-gray-800 flex items-center justify-center">
         <span className={`font-bold text-xs ${isRed ? 'text-red-600' : 'text-black'}`}>
-          {rank}{suit}
+          {value}{suit}
         </span>
       </div>
     )
@@ -176,9 +190,16 @@ export default function GameHuman({ sessionId }) {
     )
   }
 
+  // Updated betting logic with new backend fields
   const currentBet = gameState?.current_bet || 0
+  const playerCurrentBet = gameState?.player_current_bet || 0
+  const callAmount = gameState?.call_amount || (currentBet - playerCurrentBet)
+  
+  // More explicit check/call logic
+  const canCheck = currentBet === 0 || playerCurrentBet >= currentBet
+  const needsToCall = currentBet > 0 && playerCurrentBet < currentBet
+  
   const minRaise = Math.max(currentBet * 2, currentBet + (gameState?.min_bet || 100))
-  const canCheck = currentBet === 0 || (gameState?.player_current_bet || 0) === currentBet
   const isPlayerTurn = gameState?.current_player === 'player'
   const handComplete = gameState?.hand_complete || false
 
@@ -286,7 +307,11 @@ export default function GameHuman({ sessionId }) {
             <div className="text-center mb-4">
               <p className="text-white font-semibold">Your Turn</p>
               <p className="text-gray-300 text-sm">
-                {currentBet > 0 ? `Current bet to call: ${formatChips(currentBet)}` : 'No current bet'}
+                {needsToCall 
+                  ? `Call ${formatChips(callAmount)} to continue` 
+                  : canCheck 
+                    ? 'No bet to call - you can check' 
+                    : 'Action to you'}
               </p>
             </div>
 
@@ -320,7 +345,7 @@ export default function GameHuman({ sessionId }) {
                   disabled={actionLoading}
                   className="rounded-md bg-[#ff3131] px-4 py-3 text-sm font-medium text-black hover:bg-red-600 disabled:opacity-50 transition-colors"
                 >
-                  {canCheck ? 'Check' : `Call ${formatChips(currentBet)}`}
+                  {canCheck ? 'Check' : `Call ${formatChips(callAmount)}`}
                 </button>
                 
                 <button
