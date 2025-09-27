@@ -56,7 +56,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'email', 'username', 'first_name', 'last_name', 
             'university', 'major', 'phone', 'linkedin', 'github', 
             'website', 'total_earnings', 'games_played', 'games_won', 
-            'win_rate', 'created_at', 'updated_at'
+            'coins', 'win_rate', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'total_earnings', 'games_played', 'games_won']
 

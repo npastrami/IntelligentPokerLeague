@@ -14,6 +14,12 @@ export default function GameHuman({ sessionId }) {
   const [showPlayerHUD, setShowPlayerHUD] = useState(false)
   const [showOpponentHUD, setShowOpponentHUD] = useState(false)
   
+  // Showdown state
+  const [showdownActive, setShowdownActive] = useState(false)
+  const [showdownCountdown, setShowdownCountdown] = useState(0)
+  const [showdownCards, setShowdownCards] = useState({})
+  const [winner, setWinner] = useState(null)
+  
   // Code editor states
   const [code, setCode] = useState('# Live poker analysis script\nimport json\n\nclass PokerAnalyzer:\n    def __init__(self):\n        self.hand_history = []\n        \n    def analyze_game_state(self, game_state):\n        print(f"Current pot: {game_state.get(\'pot\', 0)}")\n        print(f"Your stack: {game_state.get(\'player_stack\', 0)}")\n        print(f"Current street: {game_state.get(\'current_street\', \'preflop\')}")\n        \n        if game_state.get(\'player_cards\'):\n            print(f"Your cards: {game_state[\'player_cards\']}")\n            \n        return "Analysis complete"\n\n# analyzer = PokerAnalyzer()\n# result = analyzer.analyze_game_state(game_state)')
   const [terminalOutput, setTerminalOutput] = useState([])
@@ -30,6 +36,27 @@ export default function GameHuman({ sessionId }) {
       initializeGame()
     }
   }, [actualSessionId])
+
+  // Showdown countdown effect
+  useEffect(() => {
+    let interval = null
+    if (showdownActive && showdownCountdown > 0) {
+      interval = setInterval(() => {
+        setShowdownCountdown(prev => {
+          if (prev <= 1) {
+            setShowdownActive(false)
+            setShowdownCards({})
+            setWinner(null)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [showdownActive, showdownCountdown])
 
   const initializeGame = async () => {
     try {
@@ -241,6 +268,15 @@ export default function GameHuman({ sessionId }) {
         if (data.street_changed) {
           addToGameLog(`${data.current_street} revealed`)
         }
+
+        // Handle showdown
+        if (data.showdown) {
+          setShowdownActive(true)
+          setShowdownCountdown(5)
+          setShowdownCards(data.showdown_cards || {})
+          setWinner(data.winner)
+          addToGameLog('Showdown! Cards revealed.')
+        }
       } else {
         const errorData = await response.json()
         setError(errorData.error || 'Invalid move')
@@ -253,6 +289,8 @@ export default function GameHuman({ sessionId }) {
   }
 
   const startNewHand = async () => {
+    if (showdownActive) return // Don't allow new hand during showdown
+    
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
@@ -271,6 +309,12 @@ export default function GameHuman({ sessionId }) {
         setGameLog([])
         addToGameLog('New hand started')
         setError(null)
+        
+        // Reset showdown state
+        setShowdownActive(false)
+        setShowdownCards({})
+        setWinner(null)
+        setShowdownCountdown(0)
       }
     } catch (err) {
       setError('Failed to start new hand')
@@ -317,6 +361,18 @@ export default function GameHuman({ sessionId }) {
     )
   }
 
+  const getWinnerMessage = () => {
+    if (!winner) return ''
+    
+    if (winner === 'player') {
+      return `You win $${formatChips(gameState?.pot || 0)}!`
+    } else if (winner === 'bot') {
+      return `Bot wins $${formatChips(gameState?.pot || 0)}.`
+    } else {
+      return `Split pot! Each player wins $${formatChips((gameState?.pot || 0) / 2)}.`
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-[80%] bg-[#19191E] flex items-center justify-center">
@@ -352,6 +408,11 @@ export default function GameHuman({ sessionId }) {
   const isPlayerTurn = gameState?.current_player === 'player'
   const handComplete = gameState?.hand_complete || false
 
+  // Determine which cards to show for opponent
+  const opponentCards = showdownActive && showdownCards?.bot_cards 
+    ? showdownCards.bot_cards 
+    : gameState?.bot_cards || []
+
   return (
     <div className="min-h-screen bg-[#19191E] flex">
       {/* Main Game Area - 70% width */}
@@ -364,7 +425,7 @@ export default function GameHuman({ sessionId }) {
           >
             Back to Games
           </button>
-          {!isPlayerTurn && !handComplete && (
+          {!isPlayerTurn && !handComplete && !showdownActive && (
             <p className="text-white font-semibold">Waiting for opponent...</p>
           )}
         </div>
@@ -378,6 +439,14 @@ export default function GameHuman({ sessionId }) {
           </p>
           {error && (
             <p className="text-[#ff3131] text-sm mt-1">{error}</p>
+          )}
+          
+          {/* Showdown countdown */}
+          {showdownActive && (
+            <div className="mt-2 p-3 bg-yellow-600 rounded-lg">
+              <p className="text-black font-bold text-lg">{getWinnerMessage()}</p>
+              <p className="text-black text-sm">Next hand in {showdownCountdown} seconds...</p>
+            </div>
           )}
         </div>
 
@@ -414,8 +483,17 @@ export default function GameHuman({ sessionId }) {
                   </p>
                   <p className="text-gray-300 text-sm">{formatChips(gameState?.bot_stack)} chips</p>
                   <div className="flex space-x-1 mt-2 justify-center">
-                    {renderCard(null, true)}
-                    {renderCard(null, true)}
+                    {opponentCards.length > 0 ? (
+                      <>
+                        {renderCard(opponentCards[0])}
+                        {renderCard(opponentCards[1])}
+                      </>
+                    ) : (
+                      <>
+                        {renderCard(null, true)}
+                        {renderCard(null, true)}
+                      </>
+                    )}
                   </div>
                   
                   {/* Opponent HUD Toggle Button */}
@@ -503,7 +581,7 @@ export default function GameHuman({ sessionId }) {
         </div>
 
         {/* Action Panel */}
-        {!handComplete && isPlayerTurn && (
+        {!handComplete && isPlayerTurn && !showdownActive && (
           <div className="mt-8 bg-gray-800 rounded-lg p-6 border border-gray-700">
             <div className="text-center mb-4">
               <p className="text-white font-semibold">Your Turn</p>
@@ -560,7 +638,7 @@ export default function GameHuman({ sessionId }) {
         )}
 
         {/* Hand Complete */}
-        {handComplete && (
+        {handComplete && !showdownActive && (
           <div className="mt-8 bg-gray-800 rounded-lg p-6 border border-gray-700 text-center">
             <h3 className="text-white font-semibold mb-2">Hand Complete</h3>
             <p className="text-gray-300 mb-4">
@@ -569,10 +647,10 @@ export default function GameHuman({ sessionId }) {
             </p>
             <button
               onClick={startNewHand}
-              disabled={loading}
+              disabled={loading || showdownActive}
               className="rounded-md bg-[#ff3131] px-6 py-2 text-sm font-medium text-black hover:bg-red-600 disabled:opacity-50"
             >
-              {loading ? 'Starting...' : 'Start New Hand'}
+              {loading ? 'Starting...' : showdownActive ? `Next hand in ${showdownCountdown}s` : 'Start New Hand'}
             </button>
           </div>
         )}
