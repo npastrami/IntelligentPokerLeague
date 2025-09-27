@@ -34,6 +34,8 @@ urlpatterns = [
     path('bot-game/pause/', views.pause_bot_game_simulation, name='pause_bot_game'),
     path('bot-game/status/', views.get_bot_game_progress, name='bot_game_status'),
     
+
+
     # Bot management endpoints
     path('get-opponent-bots/', views.get_available_opponent_bots, name='get_available_opponent_bots'),
     
