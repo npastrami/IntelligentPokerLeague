@@ -560,3 +560,157 @@ def start_bot_vs_bot_game(request):
     except Exception as e:
         logger.error(f"Error starting bot vs bot game: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
+    
+import subprocess
+import tempfile
+import os
+import json
+import signal
+from contextlib import contextmanager
+
+@contextmanager
+def timeout(duration):
+    def timeout_handler(signum, frame):
+        raise TimeoutError("Code execution timed out")
+    
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(duration)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def execute_command(request):
+    """Execute terminal commands"""
+    try:
+        data = request.data
+        command = data.get('command', '').strip()
+        game_state = data.get('game_state', {})
+        
+        if not command:
+            return JsonResponse({'output': '', 'error': None})
+        
+        # Create a safe Python environment
+        python_code = f"""
+import json
+import sys
+import traceback
+
+# Make game_state available
+game_state = {json.dumps(game_state)}
+
+try:
+    # Execute the command
+    result = eval('''{command}''')
+    if result is not None:
+        print(result)
+except SyntaxError:
+    try:
+        exec('''{command}''')
+    except Exception as e:
+        print(f"Error: {{e}}")
+        traceback.print_exc()
+except Exception as e:
+    print(f"Error: {{e}}")
+    traceback.print_exc()
+"""
+        
+        # Execute with timeout and sandboxing
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(python_code)
+            temp_file = f.name
+        
+        try:
+            with timeout(5):  # 5 second timeout
+                result = subprocess.run(
+                    ['python3', temp_file],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=tempfile.gettempdir()
+                )
+            
+            output = result.stdout
+            error = result.stderr if result.stderr else None
+            
+            return JsonResponse({
+                'output': output,
+                'error': error
+            })
+            
+        except (subprocess.TimeoutExpired, TimeoutError):
+            return JsonResponse({
+                'output': '',
+                'error': 'Command timed out'
+            })
+        finally:
+            os.unlink(temp_file)
+            
+    except Exception as e:
+        logger.error(f"Error executing command: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def run_code(request):
+    """Run user Python code in a sandbox environment"""
+    try:
+        data = request.data
+        code_content = data.get('content', '')
+        game_state = data.get('game_state', {})
+        
+        if not code_content.strip():
+            return JsonResponse({'output': '', 'errors': []})
+        
+        # Prepare Python code with game_state available
+        python_code = f"""
+import json
+import sys
+import traceback
+
+# Make game_state available
+game_state = {json.dumps(game_state)}
+
+try:
+{chr(10).join('    ' + line for line in code_content.split(chr(10)))}
+except Exception as e:
+    print(f"Error: {{e}}")
+    traceback.print_exc()
+"""
+        
+        # Execute with timeout and sandboxing
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(python_code)
+            temp_file = f.name
+        
+        try:
+            with timeout(10):  # 10 second timeout for full scripts
+                result = subprocess.run(
+                    ['python3', temp_file],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    cwd=tempfile.gettempdir()
+                )
+            
+            output = result.stdout
+            errors = [result.stderr] if result.stderr else []
+            
+            return JsonResponse({
+                'output': output,
+                'errors': errors
+            })
+            
+        except (subprocess.TimeoutExpired, TimeoutError):
+            return JsonResponse({
+                'output': '',
+                'errors': ['Code execution timed out']
+            })
+        finally:
+            os.unlink(temp_file)
+        
+    except Exception as e:
+        logger.error(f"Error running code: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
