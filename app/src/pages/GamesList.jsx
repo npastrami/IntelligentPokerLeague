@@ -74,12 +74,58 @@ export default function GamesList() {
     }
   }, [showStartGameModal])
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Creating game:', formData)
-    setShowCreateForm(false)
-    setFormData({ botName: '', bankroll: '', hands: '', description: '' })
+    console.log('Creating game:', formData);
+
+    try {
+    //   const token = localStorage.getItem('token')
+    //   const response = await fetch('http://localhost:8000/api/poker/initialize-game/', {
+    //     method: 'POST',
+    //     headers: {
+    //       'Authorization': `Token ${token}`,
+    //       'Content-Type': 'application/json'
+    //     },
+    //     body: JSON.stringify(formData)
+    //   })
+      
+    //   if (response.ok) {
+    //     const data = await response.json()
+    //     setUserBots(data.bots)
+    //   } else {
+    //     console.error('Failed to create bot:', await response.text())
+    //   }
+
+    //   setShowCreateForm(false)
+    //   setFormData({ botName: '', bankroll: '', hands: '', description: '' })
+    // } catch (error) {
+    //   console.error('Error creating bot:', error)
+    // }
+    
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost:8000/api/poker/post-bot/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setUserBots(data.bots)
+      } else {
+        console.error('Failed to create bot:', await response.text())
+      }
+
+      setShowCreateForm(false)
+      setFormData({ botName: '', bankroll: '', hands: '', description: '' })
+    } catch (error) {
+      console.error('Error creating bot:', error)
+    }
   }
+
 
   const handleChallenge = (game) => {
     setSelectedGame(game)

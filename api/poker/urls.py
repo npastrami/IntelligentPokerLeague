@@ -22,7 +22,7 @@ urlpatterns = [
     path('exit-game/', views.exit_game, name='exit_game'),
     path('execute-command/', views.execute_command, name='execute_command'),
     path('run-code/', views.run_code, name='run_code'),
-    
+
     # Development environment
     path('dev/save-code/', views.save_code, name='save_code'),
     path('dev/run-code/', views.run_code, name='run_code'),

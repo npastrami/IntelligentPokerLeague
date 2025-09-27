@@ -34,7 +34,7 @@ def register_user(request):
         user.save()
         
         # Send verification email
-        send_verification_email(user, verification_token, request)
+        # send_verification_email(user, verification_token, request)
         
         token, created = Token.objects.get_or_create(user=user)
         return Response({
