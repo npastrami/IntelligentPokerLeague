@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Editor from '@monaco-editor/react'
-import { FolderIcon, DocumentIcon, PlusIcon, PlayIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
+import { FolderIcon, DocumentIcon, PlusIcon, PlayIcon, ArrowDownTrayIcon, ArrowDownIcon, CommandLineIcon } from '@heroicons/react/24/outline'
 
 export default function MonacoEditor() {
   const [selectedFile, setSelectedFile] = useState(null)
@@ -25,15 +25,94 @@ export default function MonacoEditor() {
     ]
   }
 
-  const handleSave = () => {
-    console.log('Saving file:', selectedFile, code)
-    // TODO: Save to backend
+
+  const handleSave = async () => {
+  if (!selectedFile) {
+    alert("Please select a file to save.");
+    return;
   }
 
+  const filename = selectedFile.split('/').pop();
+
+  const payload = {
+    filename: filename,
+    content: code,
+  };
+
+  try {
+    const response = await fetch('http://localhost:8000/api/save-code/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+       
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) throw new Error('Failed to save file. Try again.');
+
+    const data = await response.json();
+    console.log('File saved successfully:', data);
+  } catch (error) {
+    console.error('Error saving file:', error);
+  }
+};
+
+ 
   const handleRun = () => {
     console.log('Running bot:', code)
     // TODO: Send to game engine for testing
   }
+
+const uploadFile = async () => {
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.py,.wls';
+
+  fileInput.onchange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+      alert('Oh oh please select a file. Make sure it is a .wls or .py file.');
+      return;
+    }
+
+    const allowedExtensions = ['.py', '.wls'];
+    const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (!allowedExtensions.includes(extension)) {
+      alert('Unsupported file type. Please upload a .wls or .py file');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('http://localhost:8000/api/upload-file/', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('File upload failed :( . Please try again.');
+      }
+
+      const data = await response.json();
+      console.log('Upload Successful:', data);
+
+      if (data.content) {
+        setCode(data.content);
+        setSelectedFile(`Uploaded/${file.name}`);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('An error occurred while uploading. Please try again');
+    }
+  };
+
+  fileInput.click(); 
+};
+
 
   const createNewFile = () => {
     if (newFileName) {
@@ -114,6 +193,13 @@ export default function MonacoEditor() {
               >
                 <PlayIcon className="h-4 w-4 mr-1" />
                 Test Bot
+              </button>
+              <button
+                onClick={uploadFile}
+                className="flex items-center px-3 py-1 bg-red-600 text-white rounded hover:bg-red-500"
+              >
+                <CommandLineIcon className="h-4 w-4 mr-1"/>
+                Load Code 
               </button>
             </div>
           </div>
