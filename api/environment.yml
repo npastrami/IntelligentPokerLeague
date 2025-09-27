@@ -1,4 +1,4 @@
-name: base
+name: mydjangoenv
 channels:
   - https://repo.anaconda.com/pkgs/main
   - https://repo.anaconda.com/pkgs/r
@@ -14,4 +14,3 @@ dependencies:
   - conda-libmamba-solver
   - menuinst
   - anaconda-anon-usage
-prefix: /home/npastrami/miniconda3
