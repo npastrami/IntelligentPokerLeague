@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
 import { PlayIcon, XMarkIcon, DocumentIcon } from '@heroicons/react/24/outline'
+import DraggableHUD from '../components/DraggableHud'
+import HUDToggleButton from '../components/HUDToggleButton'
 
 export default function GameHuman({ sessionId }) {
   const [gameState, setGameState] = useState(null)
@@ -9,6 +11,8 @@ export default function GameHuman({ sessionId }) {
   const [raiseAmount, setRaiseAmount] = useState('')
   const [error, setError] = useState(null)
   const [gameLog, setGameLog] = useState([])
+  const [showPlayerHUD, setShowPlayerHUD] = useState(false)
+  const [showOpponentHUD, setShowOpponentHUD] = useState(false)
   
   // Code editor states
   const [code, setCode] = useState('# Live poker analysis script\nimport json\n\nclass PokerAnalyzer:\n    def __init__(self):\n        self.hand_history = []\n        \n    def analyze_game_state(self, game_state):\n        print(f"Current pot: {game_state.get(\'pot\', 0)}")\n        print(f"Your stack: {game_state.get(\'player_stack\', 0)}")\n        print(f"Current street: {game_state.get(\'current_street\', \'preflop\')}")\n        \n        if game_state.get(\'player_cards\'):\n            print(f"Your cards: {game_state[\'player_cards\']}")\n            \n        return "Analysis complete"\n\n# analyzer = PokerAnalyzer()\n# result = analyzer.analyze_game_state(game_state)')
@@ -383,8 +387,28 @@ export default function GameHuman({ sessionId }) {
             
             {/* Opponent Seat */}
             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="text-center">
-                <div className="bg-gray-800 rounded-lg p-3 border border-gray-600" style={{  width: '150px'}}>
+              {/* Opponent Draggable HUD */}
+              {showOpponentHUD && (
+                <DraggableHUD 
+                  playerName={gameState?.opponent_bot?.name || 'Opponent Bot'}
+                  hands={285}
+                  playerStats={{
+                    vpip: 15,
+                    pfr: 12,
+                    ats: 28,
+                    f2s: 72,
+                    '3b': 5,
+                    f3b: 78,
+                    cb: 68,
+                    fcb: 52,
+                    wtsd: 22,
+                    wsd: 48
+                  }}
+                />
+              )}
+              
+              <div className="text-center relative">
+                <div className="bg-gray-800 rounded-lg p-3 border border-gray-600" style={{ width: '150px' }}>
                   <p className="text-white font-semibold">
                     {gameState?.opponent_bot?.name || 'Opponent Bot'}
                   </p>
@@ -393,6 +417,12 @@ export default function GameHuman({ sessionId }) {
                     {renderCard(null, true)}
                     {renderCard(null, true)}
                   </div>
+                  
+                  {/* Opponent HUD Toggle Button */}
+                  <HUDToggleButton 
+                    isVisible={showOpponentHUD}
+                    onToggle={() => setShowOpponentHUD(!showOpponentHUD)}
+                  />
                 </div>
               </div>
             </div>
@@ -423,8 +453,29 @@ export default function GameHuman({ sessionId }) {
             </div>
 
             {/* Player Seat */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 translate-y-1/2" style={{  width: '150px', marginTop: '250px'}}>
-              <div className="text-center">
+            <div className="absolute left-1/2 transform -translate-x-1/2 translate-y-1/2" style={{ marginTop: '250px' }}>
+              {/* Player Draggable HUD */}
+              {showPlayerHUD && (
+                <DraggableHUD 
+                  playerName="You"
+                  hands={450}
+                  playerStats={{
+                    vpip: 24,
+                    pfr: 18,
+                    ats: 32,
+                    f2s: 65,
+                    '3b': 8,
+                    f3b: 72,
+                    cb: 75,
+                    fcb: 58,
+                    wtsd: 28,
+                    wsd: 52
+                  }}
+                />
+              )}
+              
+              {/* Player card */}
+              <div className="text-center relative" style={{ width: '150px' }}>
                 <div className="bg-gray-800 rounded-lg p-3 border border-gray-600">
                   <p className="text-white font-semibold">You</p>
                   <p className="text-gray-300 text-sm">{formatChips(gameState?.player_stack)} chips</p>
@@ -438,9 +489,16 @@ export default function GameHuman({ sessionId }) {
                       <div key="1" className="w-8 h-12">{renderCard(null, true)}</div>
                     ]}
                   </div>
+                  
+                  {/* Player HUD Toggle Button */}
+                  <HUDToggleButton 
+                    isVisible={showPlayerHUD}
+                    onToggle={() => setShowPlayerHUD(!showPlayerHUD)}
+                  />
                 </div>
               </div>
             </div>
+
           </div>
         </div>
 
