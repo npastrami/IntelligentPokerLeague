@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import SmartHUD from './SmartHud';
 
 const DraggableHUD = ({ playerName, hands, playerStats }) => {
-  const [position, setPosition] = useState({ x: -240, y: -100 }); // Initial position
+  const [position, setPosition] = useState({ x: 0, y: 0 }); // Initial position
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const hudRef = useRef(null);

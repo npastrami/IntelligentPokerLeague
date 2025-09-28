@@ -81,7 +81,7 @@ const SmartHUD = ({ playerStats, playerName = "Player", hands = 100 }) => {
         
         {/* Tooltip */}
         {isHovered && (
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50">
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50 pointer-events-none">
             <div className="bg-neutral-900 border border-neutral-600 rounded-lg p-3 shadow-lg min-w-[200px]">
               <div className="text-white font-semibold text-sm mb-1">{name}</div>
               <div className="text-neutral-300 text-xs mb-2">{desc}</div>
