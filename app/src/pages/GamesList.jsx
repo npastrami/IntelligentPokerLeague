@@ -272,7 +272,7 @@ export default function GamesList() {
         <div className="mb-8">
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="inline-flex items-center rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-red-600"
+            className="inline-flex items-center rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-600"
           >
             <PlusIcon className="mr-2 h-4 w-4" />
             Post New Bot
@@ -344,7 +344,7 @@ export default function GamesList() {
               <div className="flex space-x-3">
                 <button
                   onClick={handleSubmit}
-                  className="rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-black hover:bg-red-600"
+                  className="rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
                 >
                   Post Bot
                 </button>
@@ -392,7 +392,7 @@ export default function GamesList() {
                 <button
                   onClick={() => handleChallenge(game)}
                   disabled={game.status === 'in_game'}
-                  className="flex-1 rounded-md bg-[#ff3131] px-3 py-2 text-sm font-medium text-black hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 rounded-md bg-[#ff3131] px-3 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {game.status === 'waiting' ? 'Challenge' : 'In Progress'}
                 </button>
@@ -532,7 +532,7 @@ export default function GamesList() {
                     disabled={loading || 
                              (gameMode === 'bot' && !selectedPlayerBot) ||
                              (gameMode === 'human' && !canAffordBuyIn)}
-                    className="flex-1 rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-black hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? 'Starting...' : 'Start Game'}
                   </button>
