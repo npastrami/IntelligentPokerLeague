@@ -35,13 +35,13 @@ const SmartHUD = ({ playerStats, playerName = "Player", hands = 100 }) => {
     };
 
     const range = ranges[statName];
-    if (!range) return 'text-gray-400';
+    if (!range) return 'text-neutral-400';
 
     if (value >= range.red[0] && value <= range.red[1]) return 'text-red-400';
     if (value >= range.green[0] && value <= range.green[1]) return 'text-green-400';
     if (value >= range.orange[0] && value <= range.orange[1]) return 'text-yellow-400';
 
-    return 'text-gray-400';
+    return 'text-neutral-400';
   };
 
   // Full stat names for tooltips
@@ -68,11 +68,11 @@ const SmartHUD = ({ playerStats, playerName = "Player", hands = 100 }) => {
 
     return (
       <div 
-        className="relative flex flex-col items-center justify-center p-1 bg-gray-800 bg-opacity-90 rounded border border-gray-600 min-w-[32px] h-12 cursor-help"
+        className="relative flex flex-col items-center justify-center p-1 bg-neutral-800 bg-opacity-90 rounded border border-neutral-600 min-w-[32px] h-12 cursor-help"
         onMouseEnter={() => setHoveredStat(statName)}
         onMouseLeave={() => setHoveredStat(null)}
       >
-        <div className="text-[9px] text-gray-400 uppercase font-semibold">
+        <div className="text-[9px] text-neutral-400 uppercase font-semibold">
           {statName === '3b' ? '3B' : statName.toUpperCase()}
         </div>
         <div className={`text-sm font-bold ${colorClass} leading-tight`}>
@@ -82,21 +82,21 @@ const SmartHUD = ({ playerStats, playerName = "Player", hands = 100 }) => {
         {/* Tooltip */}
         {isHovered && (
           <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50">
-            <div className="bg-gray-900 border border-gray-600 rounded-lg p-3 shadow-lg min-w-[200px]">
+            <div className="bg-neutral-900 border border-neutral-600 rounded-lg p-3 shadow-lg min-w-[200px]">
               <div className="text-white font-semibold text-sm mb-1">{name}</div>
-              <div className="text-gray-300 text-xs mb-2">{desc}</div>
+              <div className="text-neutral-300 text-xs mb-2">{desc}</div>
               <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-400">Value:</span>
+                <span className="text-neutral-400">Value:</span>
                 <span className={`font-bold ${colorClass}`}>{value}%</span>
               </div>
               <div className="flex justify-between items-center text-xs mt-1">
-                <span className="text-gray-400">Hands:</span>
-                <span className="text-gray-300">{hands}</span>
+                <span className="text-neutral-400">Hands:</span>
+                <span className="text-neutral-300">{hands}</span>
               </div>
             </div>
             {/* Arrow */}
             <div className="absolute top-full left-1/2 transform -translate-x-1/2">
-              <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-600"></div>
+              <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-neutral-600"></div>
             </div>
           </div>
         )}
@@ -105,11 +105,11 @@ const SmartHUD = ({ playerStats, playerName = "Player", hands = 100 }) => {
   };
 
   return (
-    <div className="relative z-10 bg-gray-900 bg-opacity-95 border border-gray-700 rounded-lg p-2 font-mono text-xs shadow-lg pointer-events-auto">
+    <div className="relative z-10 bg-neutral-900 bg-opacity-95 border border-neutral-700 rounded-lg p-2 font-mono text-xs shadow-lg pointer-events-auto">
       {/* Player Header */}
       <div className="text-center mb-2 px-1">
         <div className="text-white font-semibold text-xs truncate">{playerName}</div>
-        <div className="text-gray-400 text-[10px]">{hands}h</div>
+        <div className="text-neutral-400 text-[10px]">{hands}h</div>
       </div>
       
       {/* Stats Grid - 5 columns, 2 rows */}

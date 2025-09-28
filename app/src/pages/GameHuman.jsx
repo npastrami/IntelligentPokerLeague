@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
 import { PlayIcon, XMarkIcon, DocumentIcon } from '@heroicons/react/24/outline'
-import DraggableHUD from '../components/DraggableHud'
-import HUDToggleButton from '../components/HUDToggleButton'
+import PlayerSeat from '../components/PlayerSeat'
 
 export default function GameHuman({ sessionId }) {
   const [gameState, setGameState] = useState(null)
@@ -328,14 +327,14 @@ export default function GameHuman({ sessionId }) {
   const renderCard = (card, isHidden = false) => {
     if (isHidden) {
       return (
-        <div className="w-8 h-12 bg-gray-600 rounded border border-white flex items-center justify-center">
+        <div className="w-8 h-12 bg-neutral-600 rounded border border-white flex items-center justify-center">
           <span className="text-white text-xs">?</span>
         </div>
       )
     }
 
     if (!card) {
-      return <div className="w-12 h-16 bg-gray-600 rounded border border-gray-500"></div>
+      return <div className="w-12 h-16 bg-neutral-600 rounded border border-neutral-500"></div>
     }
 
     let value, suit, isRed;
@@ -349,11 +348,11 @@ export default function GameHuman({ sessionId }) {
       suit = card.suit_symbol || card.suit;
       isRed = card.suit === 'hearts' || card.suit === 'diamonds';
     } else {
-      return <div className="w-12 h-16 bg-gray-600 rounded border border-gray-500"></div>
+      return <div className="w-12 h-16 bg-neutral-600 rounded border border-neutral-500"></div>
     }
     
     return (
-      <div className="w-12 h-16 bg-white rounded border-2 border-gray-800 flex items-center justify-center">
+      <div className="w-12 h-16 bg-white rounded border-2 border-neutral-800 flex items-center justify-center">
         <span className={`font-bold text-xs ${isRed ? 'text-red-600' : 'text-black'}`}>
           {value}{suit}
         </span>
@@ -375,7 +374,7 @@ export default function GameHuman({ sessionId }) {
 
   if (loading) {
     return (
-      <div className="min-h-[80%] bg-[#19191E] flex items-center justify-center">
+      <div className="min-h-[80%] bg-neutral-900 flex items-center justify-center">
         <div className="text-white text-xl">Loading game...</div>
       </div>
     )
@@ -383,7 +382,7 @@ export default function GameHuman({ sessionId }) {
 
   if (error && !gameState) {
     return (
-      <div className="min-h-screen bg-[#19191E] flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-900 flex items-center justify-center">
         <div className="text-center">
           <div className="text-[#ff3131] text-xl mb-4">{error}</div>
           <button
@@ -414,14 +413,14 @@ export default function GameHuman({ sessionId }) {
     : gameState?.bot_cards || []
 
   return (
-    <div className="min-h-screen bg-[#19191E] flex">
+    <div className="min-h-screen bg-neutral-900 flex">
       {/* Main Game Area - 70% width */}
       <div className={`${showEditor ? 'w-[70%]' : 'w-full'} p-4 transition-all duration-300`}>
         {/* Top Left Controls */}
         <div className="absolute top-20 left-4 z-50">
           <button
             onClick={() => window.location.href = '/games'}
-            className="rounded-md bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-500 mb-2 block"
+            className="rounded-md bg-neutral-600 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-500 mb-2 block"
           >
             Back to Games
           </button>
@@ -433,7 +432,7 @@ export default function GameHuman({ sessionId }) {
         {/* Game Info Header */}
         <div className="mb-4 text-center">
           <h1 className="text-2xl font-bold text-white">Heads-Up Poker</h1>
-          <p className="text-gray-300">
+          <p className="text-neutral-300">
             Hand #{gameState?.hands_played || 1} • {gameState?.current_street || 'preflop'} 
             {gameState?.last_action && ` • ${gameState.last_action}`}
           </p>
@@ -443,9 +442,9 @@ export default function GameHuman({ sessionId }) {
           
           {/* Showdown countdown */}
           {showdownActive && (
-            <div className="mt-2 p-3 bg-yellow-600 rounded-lg">
-              <p className="text-black font-bold text-lg">{getWinnerMessage()}</p>
-              <p className="text-black text-sm">Next hand in {showdownCountdown} seconds...</p>
+            <div className="mt-2 p-3 bg-neutral-500 rounded-lg">
+              <p className="text-white font-bold text-lg">{getWinnerMessage()}</p>
+              <p className="text-white text-sm">Next hand in {showdownCountdown} seconds...</p>
             </div>
           )}
         </div>
@@ -455,55 +454,22 @@ export default function GameHuman({ sessionId }) {
           <div className="relative rounded-full bg-green-800 border-8 border-amber-600 shadow-2xl" style={{ aspectRatio: '3/2', minHeight: '100px' }}>
             
             {/* Opponent Seat */}
-            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              {/* Opponent Draggable HUD */}
-              {showOpponentHUD && (
-                <DraggableHUD 
-                  playerName={gameState?.opponent_bot?.name || 'Opponent Bot'}
-                  hands={285}
-                  playerStats={{
-                    vpip: 15,
-                    pfr: 12,
-                    ats: 28,
-                    f2s: 72,
-                    '3b': 5,
-                    f3b: 78,
-                    cb: 68,
-                    fcb: 52,
-                    wtsd: 22,
-                    wsd: 48
-                  }}
-                />
-              )}
-              
-              <div className="text-center relative">
-                <div className="bg-gray-800 rounded-lg p-3 border border-gray-600" style={{ width: '150px' }}>
-                  <p className="text-white font-semibold">
-                    {gameState?.opponent_bot?.name || 'Opponent Bot'}
-                  </p>
-                  <p className="text-gray-300 text-sm">{formatChips(gameState?.bot_stack)} chips</p>
-                  <div className="flex space-x-1 mt-2 justify-center">
-                    {opponentCards.length > 0 ? (
-                      <>
-                        {renderCard(opponentCards[0])}
-                        {renderCard(opponentCards[1])}
-                      </>
-                    ) : (
-                      <>
-                        {renderCard(null, true)}
-                        {renderCard(null, true)}
-                      </>
-                    )}
-                  </div>
-                  
-                  {/* Opponent HUD Toggle Button */}
-                  <HUDToggleButton 
-                    isVisible={showOpponentHUD}
-                    onToggle={() => setShowOpponentHUD(!showOpponentHUD)}
-                  />
-                </div>
-              </div>
-            </div>
+            <PlayerSeat
+              positionClasses="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+              playerName={gameState?.opponent_bot?.name || "Opponent Bot"}
+              stack={gameState?.bot_stack}
+              cards={opponentCards}
+              isHUDVisible={showOpponentHUD}
+              onToggleHUD={() => setShowOpponentHUD(!showOpponentHUD)}
+              hudStats={{
+                vpip: 15, pfr: 12, ats: 28, f2s: 72,
+                "3b": 5, f3b: 78, cb: 68, fcb: 52,
+                wtsd: 22, wsd: 48,
+              }}
+              hands={285}
+              renderCard={renderCard}
+              formatChips={formatChips}
+            />
 
             {/* Community Cards */}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
@@ -522,7 +488,7 @@ export default function GameHuman({ sessionId }) {
                     {renderCard(gameState?.board_cards?.[4])}
                   </div>
                 </div>
-                <div className="flex justify-center space-x-8 mt-1 text-xs text-gray-300">
+                <div className="flex justify-center space-x-8 mt-1 text-xs text-neutral-300">
                   <span>Flop</span>
                   <span>Turn</span>
                   <span>River</span>
@@ -531,61 +497,32 @@ export default function GameHuman({ sessionId }) {
             </div>
 
             {/* Player Seat */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 translate-y-1/2" style={{ marginTop: '250px' }}>
-              {/* Player Draggable HUD */}
-              {showPlayerHUD && (
-                <DraggableHUD 
-                  playerName="You"
-                  hands={450}
-                  playerStats={{
-                    vpip: 24,
-                    pfr: 18,
-                    ats: 32,
-                    f2s: 65,
-                    '3b': 8,
-                    f3b: 72,
-                    cb: 75,
-                    fcb: 58,
-                    wtsd: 28,
-                    wsd: 52
-                  }}
-                />
-              )}
-              
-              {/* Player card */}
-              <div className="text-center relative" style={{ width: '150px' }}>
-                <div className="bg-gray-800 rounded-lg p-3 border border-gray-600">
-                  <p className="text-white font-semibold">You</p>
-                  <p className="text-gray-300 text-sm">{formatChips(gameState?.player_stack)} chips</p>
-                  <div className="flex space-x-1 mt-2 justify-center">
-                    {gameState?.player_cards?.map((card, i) => (
-                      <div key={i} className="w-8 h-12">
-                        {renderCard(card)}
-                      </div>
-                    )) || [
-                      <div key="0" className="w-8 h-12">{renderCard(null, true)}</div>,
-                      <div key="1" className="w-8 h-12">{renderCard(null, true)}</div>
-                    ]}
-                  </div>
-                  
-                  {/* Player HUD Toggle Button */}
-                  <HUDToggleButton 
-                    isVisible={showPlayerHUD}
-                    onToggle={() => setShowPlayerHUD(!showPlayerHUD)}
-                  />
-                </div>
-              </div>
-            </div>
-
+            <PlayerSeat
+              positionClasses="absolute left-1/2 transform -translate-x-1/2 translate-y-1/2"
+              marginTop="250px"
+              playerName="You"
+              stack={gameState?.player_stack}
+              cards={gameState?.player_cards}
+              isHUDVisible={showPlayerHUD}
+              onToggleHUD={() => setShowPlayerHUD(!showPlayerHUD)}
+              hudStats={{
+                vpip: 24, pfr: 18, ats: 32, f2s: 65,
+                "3b": 8, f3b: 72, cb: 75, fcb: 58,
+                wtsd: 28, wsd: 52,
+              }}
+              hands={450}
+              renderCard={renderCard}
+              formatChips={formatChips}
+            />
           </div>
         </div>
 
         {/* Action Panel */}
         {!handComplete && isPlayerTurn && !showdownActive && (
-          <div className="mt-8 bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="mt-40 bg-neutral-800 rounded-lg p-6 border border-neutral-700">
             <div className="text-center mb-4">
               <p className="text-white font-semibold">Your Turn</p>
-              <p className="text-gray-300 text-sm">
+              <p className="text-neutral-300 text-sm">
                 {needsToCall 
                   ? `Call ${formatChips(callAmount)} to continue` 
                   : canCheck 
@@ -603,7 +540,7 @@ export default function GameHuman({ sessionId }) {
                   onChange={(e) => setRaiseAmount(e.target.value)}
                   min={minRaise}
                   max={gameState?.player_stack}
-                  className="flex-1 rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-[#ff3131] focus:outline-none focus:ring-1 focus:ring-[#ff3131]"
+                  className="flex-1 rounded-md border border-neutral-600 bg-neutral-700 px-3 py-2 text-white placeholder-neutral-400 focus:border-[#ff3131] focus:outline-none focus:ring-1 focus:ring-[#ff3131]"
                   placeholder={`Min: ${formatChips(minRaise)}`}
                 />
               </div>
@@ -639,9 +576,9 @@ export default function GameHuman({ sessionId }) {
 
         {/* Hand Complete */}
         {handComplete && !showdownActive && (
-          <div className="mt-8 bg-gray-800 rounded-lg p-6 border border-gray-700 text-center">
+          <div className="mt-8 bg-neutral-800 rounded-lg p-6 border border-neutral-700 text-center">
             <h3 className="text-white font-semibold mb-2">Hand Complete</h3>
-            <p className="text-gray-300 mb-4">
+            <p className="text-neutral-300 mb-4">
               {gameState?.winner === 'player' ? 'You won!' : 
                gameState?.winner === 'bot' ? 'Opponent won!' : 'Split pot!'}
             </p>
@@ -658,9 +595,9 @@ export default function GameHuman({ sessionId }) {
 
       {/* Code Editor Panel - 30% width */}
       {showEditor && (
-        <div className="w-[30%] bg-slate-800 border-l border-gray-600 flex flex-col">
+        <div className="w-[30%] bg-neutral-800 border-l border-neutral-600 flex flex-col">
           {/* Editor Header */}
-          <div className="bg-slate-900 p-3 border-b border-gray-600 flex items-center justify-between">
+          <div className="bg-neutral-900 p-3 border-b border-neutral-600 flex items-center justify-between">
             <div className="flex items-center">
               <DocumentIcon className="h-5 w-5 text-white mr-2" />
               <span className="text-white font-medium">live_analysis.py</span>
@@ -675,7 +612,7 @@ export default function GameHuman({ sessionId }) {
               </button>
               <button
                 onClick={() => setShowEditor(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-neutral-400 hover:text-white"
               >
                 <XMarkIcon className="h-4 w-4" />
               </button>
@@ -683,7 +620,7 @@ export default function GameHuman({ sessionId }) {
           </div>
 
           {/* Monaco Editor */}
-          <div className="h-[60%] border-b border-gray-600">
+          <div className="h-[60%] border-b border-neutral-600">
             <Editor
               height="100%"
               defaultLanguage="python"
@@ -703,11 +640,11 @@ export default function GameHuman({ sessionId }) {
 
           {/* Interactive Terminal */}
           <div className="h-[40%] bg-black flex flex-col">
-            <div className="bg-gray-900 px-3 py-2 border-b border-gray-600 flex items-center justify-between">
+            <div className="bg-neutral-900 px-3 py-2 border-b border-neutral-600 flex items-center justify-between">
               <span className="text-white font-medium text-sm">Terminal</span>
               <button
                 onClick={clearTerminal}
-                className="text-gray-400 hover:text-white text-xs"
+                className="text-neutral-400 hover:text-white text-xs"
               >
                 Clear
               </button>
@@ -721,21 +658,21 @@ export default function GameHuman({ sessionId }) {
                     output.type === 'error' ? 'text-red-400' :
                     output.type === 'command' ? 'text-green-400' :
                     output.type === 'output' ? 'text-white' :
-                    'text-gray-300'
+                    'text-neutral-300'
                   }`}>
                     {output.message}
                   </span>
                 </div>
               ))}
               {terminalOutput.length === 0 && (
-                <div className="text-gray-500">
+                <div className="text-neutral-500">
                   Interactive Python terminal ready. Type 'help' for commands.
                 </div>
               )}
             </div>
 
             {/* Command Input */}
-            <div className="border-t border-gray-600 p-2">
+            <div className="border-t border-neutral-600 p-2">
               <div className="flex items-center text-xs font-mono">
                 <span className="text-green-400 mr-2">$</span>
                 <input
@@ -757,7 +694,7 @@ export default function GameHuman({ sessionId }) {
       {!showEditor && (
         <button
           onClick={() => setShowEditor(true)}
-          className="fixed right-4 top-1/2 transform -translate-y-1/2 bg-slate-800 text-white p-2 rounded-l-lg border-l border-t border-b border-gray-600 hover:bg-slate-700"
+          className="fixed right-4 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white p-2 rounded-l-lg border-l border-t border-b border-gray-600 hover:bg-gray-700"
         >
           <DocumentIcon className="h-6 w-6" />
         </button>

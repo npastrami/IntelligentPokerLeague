@@ -184,7 +184,6 @@ class Command(BaseCommand):
             user=admin_user,
             bot=monte_carlo_bot,
             defaults={
-                'bot_name': 'Monte_Carlo_Bot',
                 'game_type': 'coins',
                 'total_hands': 100000,
                 'remaining_hands': 100000,
