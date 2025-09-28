@@ -404,7 +404,7 @@ export default function GameHuman({ sessionId }) {
   const canCheck = currentBet === 0 || playerCurrentBet >= currentBet
   const needsToCall = currentBet > 0 && playerCurrentBet < currentBet
   
-  const minRaise = Math.max(currentBet * 2, currentBet + (gameState?.min_bet || 100))
+  const minRaise = gameState?.min_raise || (currentBet > 0 ? currentBet * 2 : 2)
   const isPlayerTurn = gameState?.current_player === 'player'
   const handComplete = gameState?.hand_complete || false
 
@@ -525,7 +525,7 @@ export default function GameHuman({ sessionId }) {
                   min={minRaise}
                   max={gameState?.player_stack}
                   className="flex-1 rounded-md border border-neutral-600 bg-neutral-700 px-3 py-2 text-white placeholder-neutral-400 focus:border-[#ff3131] focus:outline-none focus:ring-1 focus:ring-[#ff3131]"
-                  placeholder={`Min: ${formatChips(minRaise)}`}
+                  placeholder={`Min: $${formatChips(minRaise)}`}
                 />
               </div>
 

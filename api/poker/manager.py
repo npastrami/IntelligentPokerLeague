@@ -570,10 +570,24 @@ class PokerGameManager:
         except Exception as e:
             logger.error(f"Error writing player B log: {str(e)}")
 
+    def _get_min_raise_amount(self, round_state):
+        """Get the minimum raise amount from the round state"""
+        if isinstance(round_state, TerminalState):
+            return 0
+        
+        try:
+            min_raise, max_raise = round_state.raise_bounds()
+            return min_raise
+        except:
+            # Fallback calculation
+            active = round_state.button % 2
+            continue_cost = round_state.pips[1-active] - round_state.pips[active]
+            return round_state.pips[active] + continue_cost + self.settings.BIG_BLIND
+
     def _get_current_bet_info(self, round_state):
         """Get current betting information for the frontend"""
         if isinstance(round_state, TerminalState):
-            return 0, 0
+            return 0, 0, 0
         
         # Get the current pip amounts
         player_pip = round_state.pips[0]  # What player has put in this street
@@ -585,7 +599,10 @@ class PokerGameManager:
         # Amount player needs to call is the difference
         call_amount = current_bet - player_pip
         
-        return current_bet, call_amount
+        # Get minimum raise amount
+        min_raise = self._get_min_raise_amount(round_state)
+        
+        return current_bet, call_amount, min_raise
 
     def _get_hand_starting_stacks(self):
         """Get hand starting stacks from session or calculate from current state"""
@@ -709,7 +726,7 @@ class PokerGameManager:
             game_message = 'Your turn!' if is_player_turn else 'Waiting for bot...'
 
         # Get betting information
-        current_bet, call_amount = self._get_current_bet_info(round_state)
+        current_bet, call_amount, min_raise = self._get_current_bet_info(round_state)
 
         return {
             'requires_buy_in': False,
@@ -721,6 +738,7 @@ class PokerGameManager:
             'board_cards': [],
             'current_bet': current_bet,
             'call_amount': call_amount,
+            'min_raise': min_raise,
             'player_current_bet': round_state.pips[0],
             'legal_actions': [] if self.is_bot_vs_bot else self._get_legal_actions(round_state) if is_player_turn else [],
             'game_message': game_message,
@@ -894,10 +912,10 @@ class PokerGameManager:
         
         # Get betting information for ongoing hands
         if not isinstance(next_state, TerminalState):
-            current_bet, call_amount = self._get_current_bet_info(next_state)
-            print(f"Betting info - Current bet: {current_bet}, Call amount: {call_amount}")
+            current_bet, call_amount, min_raise = self._get_current_bet_info(next_state)
+            print(f"Betting info - Current bet: {current_bet}, Call amount: {call_amount}, Min raise: {min_raise}")
         else:
-            current_bet, call_amount = 0, 0
+            current_bet, call_amount, min_raise = 0, 0, 0
         
         print(f"\n=== RESPONSE PREPARATION ===")
         print(f"Hand complete: {isinstance(next_state, TerminalState)}")
@@ -913,6 +931,7 @@ class PokerGameManager:
             'board_cards': self.convert_cards_to_display(self.session.board_cards),
             'current_bet': current_bet,
             'call_amount': call_amount,
+            'min_raise': min_raise,
             'player_current_bet': next_state.pips[0] if not isinstance(next_state, TerminalState) else 0,
             'legal_actions': [] if self.is_bot_vs_bot else self._get_legal_actions(next_state) if is_player_turn else [],
             'hand_complete': isinstance(next_state, TerminalState),
@@ -1194,6 +1213,7 @@ class PokerGameManager:
             'board_cards': self.convert_cards_to_display(self.session.board_cards),
             'current_bet': 0,
             'call_amount': 0,
+            'min_raise': 0,
             'player_current_bet': 0,
             'legal_actions': [],
             'hand_complete': True,
