@@ -189,3 +189,38 @@ def add_coins(request):
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cashout_game(request):
+    """Handle game cashout - add remaining stack to user's coins"""
+    try:
+        from poker.models import GameSession
+        from poker.manager import PokerGameManager
+        
+        # Get session ID from request
+        session_id = request.data.get('session_id')
+        if not session_id:
+            return Response({'error': 'Session ID required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the game session
+        try:
+            session = GameSession.objects.get(session_id=session_id, player=request.user)
+        except GameSession.DoesNotExist:
+            return Response({'error': 'Game session not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Initialize game manager and process exit
+        game_manager = PokerGameManager(session)
+        returned_coins = game_manager.process_exit_game()
+        
+        # Refresh user data from database
+        request.user.refresh_from_db()
+        
+        return Response({
+            'message': f'Successfully cashed out {returned_coins} coins',
+            'returned_coins': returned_coins,
+            'user': UserProfileSerializer(request.user).data
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
