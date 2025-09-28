@@ -49,11 +49,9 @@ const PlayerSeat = ({
               </>
             )}
           </div>
-
-          {/* HUD Toggle Button */}
-          <HUDToggleButton isVisible={isHUDVisible} onToggle={onToggleHUD} />
         </div>
       </div>
+      <HUDToggleButton isVisible={isHUDVisible} onToggle={onToggleHUD} />
     </div>
   );
 };

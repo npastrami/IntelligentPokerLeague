@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
-import Editor from '@monaco-editor/react'
-import { PlayIcon, XMarkIcon, DocumentIcon } from '@heroicons/react/24/outline'
+import Sidebar from "../components/Sidebar";
+import { DocumentIcon } from '@heroicons/react/24/outline'
 import PlayerSeat from '../components/PlayerSeat'
 import CommunityCards from '../components/CommunityCards'
+import CashoutModal from '../components/CashoutModal'
+import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
 
 export default function GameHuman({ sessionId }) {
   const [gameState, setGameState] = useState(null)
@@ -20,6 +23,11 @@ export default function GameHuman({ sessionId }) {
   const [showdownCards, setShowdownCards] = useState({})
   const [winner, setWinner] = useState(null)
   
+  // Cashout modal state
+  const [showCashoutModal, setShowCashoutModal] = useState(false)
+  const [cashoutLoading, setCashoutLoading] = useState(false)
+  const [buyInAmount, setBuyInAmount] = useState(200) // Default buy-in
+  
   // Code editor states
   const [code, setCode] = useState('# Live poker analysis script\nimport json\n\nclass PokerAnalyzer:\n    def __init__(self):\n        self.hand_history = []\n        \n    def analyze_game_state(self, game_state):\n        print(f"Current pot: {game_state.get(\'pot\', 0)}")\n        print(f"Your stack: {game_state.get(\'player_stack\', 0)}")\n        print(f"Current street: {game_state.get(\'current_street\', \'preflop\')}")\n        \n        if game_state.get(\'player_cards\'):\n            print(f"Your cards: {game_state[\'player_cards\']}")\n            \n        return "Analysis complete"\n\n# analyzer = PokerAnalyzer()\n# result = analyzer.analyze_game_state(game_state)')
   const [terminalOutput, setTerminalOutput] = useState([])
@@ -27,6 +35,9 @@ export default function GameHuman({ sessionId }) {
   const [currentCommand, setCurrentCommand] = useState('')
   const [commandHistory, setCommandHistory] = useState([])
   const [historyIndex, setHistoryIndex] = useState(-1)
+
+  const { updateUser } = useAuth()
+  const navigate = useNavigate()
 
   // Extract session ID from URL if not passed as prop
   const actualSessionId = sessionId || window.location.pathname.split('/').pop()
@@ -73,6 +84,7 @@ export default function GameHuman({ sessionId }) {
       if (response.ok) {
         const data = await response.json()
         setGameState(data)
+        setBuyInAmount(data.buy_in_amount || 200) // Set actual buy-in from response
         addToGameLog('Hand started')
         if (data.current_street !== 'preflop') {
           addToGameLog(`${data.current_street} revealed`)
@@ -84,6 +96,36 @@ export default function GameHuman({ sessionId }) {
       setError('Connection error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCashout = async () => {
+    setCashoutLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/poker/cashout/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ session_id: actualSessionId })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update user context with new coin amount
+        updateUser(data.user)
+        setShowCashoutModal(false)
+        navigate('/games')
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || 'Failed to cash out')
+      }
+    } catch (err) {
+      setError('Connection error during cashout')
+    } finally {
+      setCashoutLoading(false)
     }
   }
 
@@ -404,7 +446,7 @@ export default function GameHuman({ sessionId }) {
   const canCheck = currentBet === 0 || playerCurrentBet >= currentBet
   const needsToCall = currentBet > 0 && playerCurrentBet < currentBet
   
-  const minRaise = Math.max(currentBet * 2, currentBet + (gameState?.min_bet || 100))
+  const minRaise = gameState?.min_raise || (currentBet > 0 ? currentBet * 2 : 2)
   const isPlayerTurn = gameState?.current_player === 'player'
   const handComplete = gameState?.hand_complete || false
 
@@ -415,12 +457,22 @@ export default function GameHuman({ sessionId }) {
 
   return (
     <div className="min-h-screen bg-neutral-900 flex">
+      {/* Cashout Modal */}
+      <CashoutModal
+        isOpen={showCashoutModal}
+        onClose={() => setShowCashoutModal(false)}
+        onConfirm={handleCashout}
+        buyInAmount={buyInAmount}
+        currentStack={gameState?.player_stack || 0}
+        loading={cashoutLoading}
+      />
+
       {/* Main Game Area - 70% width */}
       <div className={`${showEditor ? 'w-[70%]' : 'w-full'} p-4 transition-all duration-300`}>
         {/* Top Left Controls */}
         <div className="absolute top-20 left-4 z-50">
           <button
-            onClick={() => window.location.href = '/games'}
+            onClick={() => setShowCashoutModal(true)}
             className="rounded-md bg-neutral-600 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-500 mb-2 block"
           >
             Back to Games
@@ -525,7 +577,7 @@ export default function GameHuman({ sessionId }) {
                   min={minRaise}
                   max={gameState?.player_stack}
                   className="flex-1 rounded-md border border-neutral-600 bg-neutral-700 px-3 py-2 text-white placeholder-neutral-400 focus:border-[#ff3131] focus:outline-none focus:ring-1 focus:ring-[#ff3131]"
-                  placeholder={`Min: ${formatChips(minRaise)}`}
+                  placeholder={`Min: $${formatChips(minRaise)}`}
                 />
               </div>
 
@@ -577,102 +629,18 @@ export default function GameHuman({ sessionId }) {
         )}
       </div>
 
-      {/* Code Editor Panel - 30% width */}
-      {showEditor && (
-        <div className="w-[30%] bg-neutral-800 border-l border-neutral-600 flex flex-col">
-          {/* Editor Header */}
-          <div className="bg-neutral-900 p-3 border-b border-neutral-600 flex items-center justify-between">
-            <div className="flex items-center">
-              <DocumentIcon className="h-5 w-5 text-white mr-2" />
-              <span className="text-white font-medium">live_analysis.py</span>
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={runCode}
-                className="flex items-center px-3 py-1 bg-green-600 text-white rounded hover:bg-green-500 text-sm"
-              >
-                <PlayIcon className="h-4 w-4 mr-1" />
-                Run
-              </button>
-              <button
-                onClick={() => setShowEditor(false)}
-                className="text-neutral-400 hover:text-white"
-              >
-                <XMarkIcon className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Monaco Editor */}
-          <div className="h-[60%] border-b border-neutral-600">
-            <Editor
-              height="100%"
-              defaultLanguage="python"
-              value={code}
-              onChange={(value) => setCode(value)}
-              theme="vs-dark"
-              options={{
-                fontSize: 12,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                wordWrap: 'on',
-                lineNumbers: 'on',
-              }}
-            />
-          </div>
-
-          {/* Interactive Terminal */}
-          <div className="h-[40%] bg-black flex flex-col">
-            <div className="bg-neutral-900 px-3 py-2 border-b border-neutral-600 flex items-center justify-between">
-              <span className="text-white font-medium text-sm">Terminal</span>
-              <button
-                onClick={clearTerminal}
-                className="text-neutral-400 hover:text-white text-xs"
-              >
-                Clear
-              </button>
-            </div>
-            
-            {/* Terminal Output */}
-            <div className="flex-1 overflow-y-auto p-2 text-xs font-mono">
-              {terminalOutput.map((output) => (
-                <div key={output.id} className="mb-1">
-                  <span className={`${
-                    output.type === 'error' ? 'text-red-400' :
-                    output.type === 'command' ? 'text-green-400' :
-                    output.type === 'output' ? 'text-white' :
-                    'text-neutral-300'
-                  }`}>
-                    {output.message}
-                  </span>
-                </div>
-              ))}
-              {terminalOutput.length === 0 && (
-                <div className="text-neutral-500">
-                  Interactive Python terminal ready. Type 'help' for commands.
-                </div>
-              )}
-            </div>
-
-            {/* Command Input */}
-            <div className="border-t border-neutral-600 p-2">
-              <div className="flex items-center text-xs font-mono">
-                <span className="text-green-400 mr-2">$</span>
-                <input
-                  type="text"
-                  value={currentCommand}
-                  onChange={(e) => setCurrentCommand(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  className="flex-1 bg-transparent text-white outline-none"
-                  placeholder="Type a command..."
-                  autoComplete="off"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Sidebar
+        code={code}
+        setCode={setCode}
+        runCode={runCode}
+        showEditor={showEditor}
+        setShowEditor={setShowEditor}
+        terminalOutput={terminalOutput}
+        clearTerminal={clearTerminal}
+        currentCommand={currentCommand}
+        setCurrentCommand={setCurrentCommand}
+        handleKeyPress={handleKeyPress}
+      />
 
       {/* Toggle Editor Button when hidden */}
       {!showEditor && (

@@ -107,8 +107,8 @@ export default function Navbar() {
                       to={item.href}
                       className={classNames(
                         location.pathname === item.href
-                          ? 'bg-[#ff3131] text-black'
-                          : 'text-white hover:bg-[#ff3131] hover:text-black',
+                          ? 'bg-[#ff3131] text-white'
+                          : 'text-white hover:bg-[#ff3131] hover:text-white',
                         'rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10'
                       )}
                       style={{ pointerEvents: 'auto' }}
@@ -132,7 +132,7 @@ export default function Navbar() {
                       <button
                         onClick={handleGetCoins}
                         disabled={addingCoins}
-                        className="bg-[#ff3131] text-black hover:bg-red-600 disabled:bg-red-400 rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
+                        className="bg-[#ff3131] text-white hover:bg-red-600 disabled:bg-red-400 rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
                         style={{ pointerEvents: 'auto' }}
                       >
                         {addingCoins ? 'Adding...' : 'Get 10K Coins'}
@@ -180,14 +180,14 @@ export default function Navbar() {
                     <div className="flex space-x-4">
                       <Link
                         to="/login"
-                        className="text-white hover:bg-[#ff3131] hover:text-black rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
+                        className="text-white hover:bg-[#ff3131] hover:text-white rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
                         style={{ pointerEvents: 'auto' }}
                       >
                         Sign in
                       </Link>
                       <Link
                         to="/register"
-                        className="bg-[#ff3131] text-black hover:bg-red-600 rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
+                        className="bg-[#ff3131] text-white hover:bg-red-600 rounded-md px-3 py-2 text-sm font-medium transition-colors relative z-10"
                         style={{ pointerEvents: 'auto' }}
                       >
                         Sign up
@@ -222,7 +222,7 @@ export default function Navbar() {
                   <button
                     onClick={handleGetCoins}
                     disabled={addingCoins}
-                    className="w-full bg-[#ff3131] text-black hover:bg-red-600 disabled:bg-red-400 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+                    className="w-full bg-[#ff3131] text-white hover:bg-red-600 disabled:bg-red-400 rounded-md px-3 py-2 text-sm font-medium transition-colors"
                   >
                     {addingCoins ? 'Adding...' : 'Get 10K Coins'}
                   </button>
@@ -235,8 +235,8 @@ export default function Navbar() {
                   to={item.href}
                   className={classNames(
                     location.pathname === item.href
-                      ? 'bg-[#ff3131] text-black'
-                      : 'text-gray-800 hover:bg-[#ff3131] hover:text-black',
+                      ? 'bg-[#ff3131] text-white'
+                      : 'text-gray-800 hover:bg-[#ff3131] hover:text-white',
                     'block rounded-md px-3 py-2 text-base font-medium transition-colors'
                   )}
                   style={{ pointerEvents: 'auto' }}
@@ -249,7 +249,7 @@ export default function Navbar() {
             {isAuthenticated ? (
               <div className="border-t border-gray-200 pb-3 pt-4 bg-white">
                 <div className="flex items-center px-5">
-                  <div className="h-10 w-10 rounded-full bg-[#ff3131] flex items-center justify-center text-black font-semibold">
+                  <div className="h-10 w-10 rounded-full bg-[#ff3131] flex items-center justify-center text-white font-semibold">
                     {user?.first_name?.[0]}{user?.last_name?.[0]}
                   </div>
                   <div className="ml-3">

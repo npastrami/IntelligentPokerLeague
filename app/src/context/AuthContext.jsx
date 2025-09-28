@@ -62,6 +62,26 @@ export const AuthProvider = ({ children }) => {
     setUser(userData)
   }
 
+  const refreshUser = async () => {
+    try {
+      if (!token) return
+
+      const response = await fetch('http://localhost:8000/api/users/profile/', {
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const userData = await response.json()
+        updateUser(userData)
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error)
+    }
+  }
+
   const isAuthenticated = !!token && !!user
 
   const value = {
@@ -70,6 +90,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     updateUser,
+    refreshUser,
     isAuthenticated,
     loading
   }

@@ -570,10 +570,24 @@ class PokerGameManager:
         except Exception as e:
             logger.error(f"Error writing player B log: {str(e)}")
 
+    def _get_min_raise_amount(self, round_state):
+        """Get the minimum raise amount from the round state"""
+        if isinstance(round_state, TerminalState):
+            return 0
+        
+        try:
+            min_raise, max_raise = round_state.raise_bounds()
+            return min_raise
+        except:
+            # Fallback calculation
+            active = round_state.button % 2
+            continue_cost = round_state.pips[1-active] - round_state.pips[active]
+            return round_state.pips[active] + continue_cost + self.settings.BIG_BLIND
+
     def _get_current_bet_info(self, round_state):
         """Get current betting information for the frontend"""
         if isinstance(round_state, TerminalState):
-            return 0, 0
+            return 0, 0, 0
         
         # Get the current pip amounts
         player_pip = round_state.pips[0]  # What player has put in this street
@@ -585,7 +599,24 @@ class PokerGameManager:
         # Amount player needs to call is the difference
         call_amount = current_bet - player_pip
         
-        return current_bet, call_amount
+        # Get minimum raise amount
+        min_raise = self._get_min_raise_amount(round_state)
+        
+        return current_bet, call_amount, min_raise
+
+    def _get_hand_starting_stacks(self):
+        """Get hand starting stacks from session or calculate from current state"""
+        # First try to get from session (preferred method)
+        if hasattr(self.session, 'hand_starting_player_stack') and hasattr(self.session, 'hand_starting_bot_stack'):
+            return [self.session.hand_starting_player_stack, self.session.hand_starting_bot_stack]
+        
+        # Fallback: try to get from instance variables if available
+        if hasattr(self, 'hand_starting_player_stack') and hasattr(self, 'hand_starting_bot_stack'):
+            return [self.hand_starting_player_stack, self.hand_starting_bot_stack]
+        
+        # Final fallback: use the starting stack constant (this may not be accurate for mid-game)
+        logger.warning("Hand starting stacks not found, using STARTING_STACK as fallback")
+        return [self.settings.STARTING_STACK, self.settings.STARTING_STACK]
 
     def start_new_hand(self, continue_session=False):
         """Initialize a new hand of poker"""
@@ -622,8 +653,15 @@ class PokerGameManager:
             starting_player_stack = self.settings.STARTING_STACK
             starting_bot_stack = self.settings.STARTING_STACK
             button = 0  # Player starts as dealer
+
+        # Store the starting stacks for this hand (before blinds) for pot calculations
+        # FIXED: Store in session so they persist across requests
+        self.session.hand_starting_player_stack = starting_player_stack
+        self.session.hand_starting_bot_stack = starting_bot_stack
+        self.hand_starting_player_stack = starting_player_stack
+        self.hand_starting_bot_stack = starting_bot_stack
             
-        logger.info(f"Starting stacks - Player: {starting_player_stack}, Bot: {starting_bot_stack}")
+        logger.info(f"Hand starting stacks - Player: {starting_player_stack}, Bot: {starting_bot_stack}")
         logger.info(f"Button position: {button}")
         
         # Initialize blinds based on button position
@@ -688,7 +726,7 @@ class PokerGameManager:
             game_message = 'Your turn!' if is_player_turn else 'Waiting for bot...'
 
         # Get betting information
-        current_bet, call_amount = self._get_current_bet_info(round_state)
+        current_bet, call_amount, min_raise = self._get_current_bet_info(round_state)
 
         return {
             'requires_buy_in': False,
@@ -700,6 +738,7 @@ class PokerGameManager:
             'board_cards': [],
             'current_bet': current_bet,
             'call_amount': call_amount,
+            'min_raise': min_raise,
             'player_current_bet': round_state.pips[0],
             'legal_actions': [] if self.is_bot_vs_bot else self._get_legal_actions(round_state) if is_player_turn else [],
             'game_message': game_message,
@@ -873,10 +912,10 @@ class PokerGameManager:
         
         # Get betting information for ongoing hands
         if not isinstance(next_state, TerminalState):
-            current_bet, call_amount = self._get_current_bet_info(next_state)
-            print(f"Betting info - Current bet: {current_bet}, Call amount: {call_amount}")
+            current_bet, call_amount, min_raise = self._get_current_bet_info(next_state)
+            print(f"Betting info - Current bet: {current_bet}, Call amount: {call_amount}, Min raise: {min_raise}")
         else:
-            current_bet, call_amount = 0, 0
+            current_bet, call_amount, min_raise = 0, 0, 0
         
         print(f"\n=== RESPONSE PREPARATION ===")
         print(f"Hand complete: {isinstance(next_state, TerminalState)}")
@@ -892,6 +931,7 @@ class PokerGameManager:
             'board_cards': self.convert_cards_to_display(self.session.board_cards),
             'current_bet': current_bet,
             'call_amount': call_amount,
+            'min_raise': min_raise,
             'player_current_bet': next_state.pips[0] if not isinstance(next_state, TerminalState) else 0,
             'legal_actions': [] if self.is_bot_vs_bot else self._get_legal_actions(next_state) if is_player_turn else [],
             'hand_complete': isinstance(next_state, TerminalState),
@@ -1014,23 +1054,26 @@ class PokerGameManager:
             if is_showdown:
                 return "Showdown! Cards revealed."
             else:
+                # Calculate the pot that was won
+                pot_won = abs(round_state.deltas[0]) if round_state.deltas[0] != 0 else abs(round_state.deltas[1])
+                
                 if self.is_bot_vs_bot:
                     # Messages for bot vs bot mode
                     player_bot_name = getattr(self.session.player_bot, 'name', 'Player bot')
                     opponent_bot_name = getattr(self.session.opponent_bot, 'name', 'Opponent bot')
                     
                     if round_state.deltas[0] > 0:
-                        return f"{player_bot_name} wins! Click 'Next Hand' to continue."
+                        return f"{player_bot_name} wins ${pot_won}! Click 'Next Hand' to continue."
                     elif round_state.deltas[0] < 0:
-                        return f"{opponent_bot_name} wins. Click 'Next Hand' to continue."
+                        return f"{opponent_bot_name} wins ${pot_won}. Click 'Next Hand' to continue."
                     else:
                         return f"Split pot! Click 'Next Hand' to continue."
                 else:
                     # Messages for human vs bot mode
                     if round_state.deltas[0] > 0:
-                        return f"You win! Click 'Next Hand' to continue."
+                        return f"You win ${pot_won}! Click 'Next Hand' to continue."
                     elif round_state.deltas[0] < 0:
-                        return f"Bot wins. Click 'Next Hand' to continue."
+                        return f"Bot wins ${pot_won}. Click 'Next Hand' to continue."
                     else:
                         return f"Split pot! Click 'Next Hand' to continue."
         elif bot_action_msg:
@@ -1045,18 +1088,24 @@ class PokerGameManager:
         return "Your turn! Choose your action."
     
     def _update_session_from_round_state(self, round_state):
-        """Update session with current round state"""
+        """Update session with current round state - FIXED"""
         if isinstance(round_state, TerminalState):
-            # Update stacks based on deltas from terminal state
-            starting_stacks = [self.settings.STARTING_STACK, self.settings.STARTING_STACK]
+            # Calculate the pot that was won before updating stacks
+            hand_starting_stacks = self._get_hand_starting_stacks()
+            
+            # Calculate total pot as chips invested during this hand
             if round_state.previous_state:
-                starting_stacks = round_state.previous_state.stacks
+                final_stacks = round_state.previous_state.stacks
+                total_pot = (hand_starting_stacks[0] + hand_starting_stacks[1]) - (final_stacks[0] + final_stacks[1])
+            else:
+                total_pot = abs(round_state.deltas[0]) + abs(round_state.deltas[1])
             
-            self.session.player_stack = starting_stacks[0] + round_state.deltas[0]
-            self.session.bot_stack = starting_stacks[1] + round_state.deltas[1]
+            # Store the pot amount before awarding it
+            self.session.pot = total_pot
             
-            # Pot goes to zero after terminal state
-            self.session.pot = 0
+            # Update stacks based on deltas from terminal state
+            self.session.player_stack = hand_starting_stacks[0] + round_state.deltas[0]
+            self.session.bot_stack = hand_starting_stacks[1] + round_state.deltas[1]
             
             if round_state.previous_state and round_state.previous_state.street > 0:
                 street = round_state.previous_state.street
@@ -1067,9 +1116,10 @@ class PokerGameManager:
             self.session.player_stack = round_state.stacks[0]
             self.session.bot_stack = round_state.stacks[1]
             
-            # Calculate pot as total chips invested by both players
-            total_invested = (self.settings.STARTING_STACK * 2) - sum(round_state.stacks)
-            self.session.pot = total_invested
+            # Calculate pot correctly based on how much each player has put in this hand
+            hand_starting_stacks = self._get_hand_starting_stacks()
+            total_put_in = (hand_starting_stacks[0] + hand_starting_stacks[1]) - (round_state.stacks[0] + round_state.stacks[1])
+            self.session.pot = total_put_in
             
             if round_state.street > 0:
                 visible_cards = round_state.deck[:round_state.street]
@@ -1163,6 +1213,7 @@ class PokerGameManager:
             'board_cards': self.convert_cards_to_display(self.session.board_cards),
             'current_bet': 0,
             'call_amount': 0,
+            'min_raise': 0,
             'player_current_bet': 0,
             'legal_actions': [],
             'hand_complete': True,

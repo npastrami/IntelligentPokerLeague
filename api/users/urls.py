@@ -10,4 +10,5 @@ urlpatterns = [
     path('stats/', views.user_stats, name='user_stats'),
     path('verify/<str:token>/', views.verify_email, name='verify_email'),
     path('add-coins/', views.add_coins, name='add_coins'),
+    path('cashout/', views.cashout_game, name='cashout_game'),
 ]
