@@ -336,52 +336,44 @@ def save_code(request):
         logger.error(f"Error saving code: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-from storages.backends.s3boto3 import S3Boto3Storage
-from django.conf import settings
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from django.http import JsonResponse
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_file(request):
     try:
+        print("Received request to create file")
+
         user_id = request.user.id
+        print(f"Authenticated user ID: {user_id}")
+
         filename = request.data.get('filename')
+        print(f"Filename from request data: {filename}")
 
         if not filename:
+            print("Filename not provided in request")
             return JsonResponse({'error': 'Filename is required'}, status=400)
 
         object_key = f"files/{user_id}/{filename}"
+        print(f"Object key for S3: {object_key}")
+
         storage = S3Boto3Storage()
         s3_client = storage.connection.meta.client
         bucket_name = storage.bucket_name
 
-        # Default content based on file extension
-        ext = filename.split('.')[-1].lower()
-        if ext == 'py':
-            content = "# New Python file\n\ndef poker_bot():\n    return 'call'\n"
-        elif ext == 'js':
-            content = "// New JavaScript file\n\nclass PokerBot {\n  makeDecision() { return 'call'; }\n}\n"
-        else:
-            content = "// New bot file\n\nclass PokerBot {\n  makeDecision() { return 'call'; }\n}\n"
+        print(f"Using bucket: {bucket_name}")
 
         s3_client.put_object(
             Bucket=bucket_name,
             Key=object_key,
-            Body=content.encode('utf-8'),
+            Body="",
             ContentType='text/plain'
         )
+        print(f"Successfully created file in S3 at key: {object_key}")
 
         return JsonResponse({'message': 'File created', 'key': object_key})
 
     except Exception as e:
+        print(f"Exception occurred: {e}")
         return JsonResponse({'error': str(e)}, status=500)
-
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from django.http import JsonResponse
-from storages.backends.s3boto3 import S3Boto3Storage
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

@@ -13,14 +13,18 @@ export default function MonacoEditor() {
   const textareaRef = useRef(null)
 
   const fetchFileStructure = async () => {
+    const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:8000/api/list-files/', {
+      const response = await fetch('http://localhost:8000/api/poker/list-files/', {
         method: 'GET',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+            'Authorization': `Token ${token}`,
         },
       });
+
+
 
       if (!response.ok) throw new Error('Failed to fetch files');
 
@@ -51,10 +55,11 @@ export default function MonacoEditor() {
     };
 
     try {
-      const response = await fetch('http://localhost:8000/api/save-file/', {
+      const response = await fetch('http://localhost:8000/api/poker/save-file/', {
         method: 'POST',
-        headers: {
+      headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
         },
         credentials: 'include',
         body: JSON.stringify(payload),
@@ -100,7 +105,7 @@ export default function MonacoEditor() {
       formData.append('file', file);
 
       try {
-        const response = await fetch('http://localhost:8000/api/upload-file/', {
+        const response = await fetch('http://localhost:8000/api/poker/upload-file/', {
           method: 'POST',
           credentials: 'include',
           body: formData,
@@ -117,7 +122,7 @@ export default function MonacoEditor() {
           setCode(data.content);
           setSelectedFile(`Uploaded/${file.name}`);
           
-          // Refresh file list after upload
+        
           await fetchFileStructure();
         }
         alert('File uploaded successfully!');
@@ -134,7 +139,6 @@ export default function MonacoEditor() {
     if (newFileName.trim()) {
       console.log('Creating file:', newFileName, 'in', selectedFolder);
       const token = localStorage.getItem('token');
-
       try {
 
         const response = await fetch('http://localhost:8000/api/poker/create-file/', {
@@ -154,10 +158,10 @@ export default function MonacoEditor() {
         const data = await response.json();
         console.log('File created on server:', data);
 
-        // Refresh file structure from server
+     
         await fetchFileStructure();
         
-        // Set as selected file and set default content
+ 
         setSelectedFile(`${selectedFolder}/${newFileName}`);
         setCode('// New file\n');
         setShowNewFileModal(false);
@@ -171,24 +175,39 @@ export default function MonacoEditor() {
     }
   };
 
-  const loadFileContent = async (filePath) => {
+  const loadFileContent = async (filePath, isNewFile = false) => {
     try {
+      // If it's a new file, don't try to load from server
+      if (isNewFile) {
+        setCode('// New file - start coding!');
+        return;
+      }
+
       const filename = filePath.split('/').pop();
       const response = await fetch(`http://localhost:8000/api/load-file/${filename}/`, {
         method: 'GET',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
         },
       });
 
-      if (!response.ok) throw new Error('Failed to load file');
+      if (!response.ok) {
+        
+        if (response.status === 404) {
+          setCode('// New file - start coding!');
+          return;
+        }
+        throw new Error(`Failed to load file: ${response.status}`);
+      }
 
       const data = await response.json();
-      setCode(data.content || '// File content could not be loaded');
+      setCode(data.content || '// Empty file');
     } catch (error) {
       console.error('Error loading file:', error);
-      setCode('// Error loading file content');
+      
+      setCode('// Error loading file. Check console for details.');
     }
   };
 
@@ -204,7 +223,6 @@ export default function MonacoEditor() {
     return ext;
   };
 
-  // Handle Tab key for indentation
   const handleKeyDown = (e) => {
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -212,24 +230,24 @@ export default function MonacoEditor() {
       const end = e.target.selectionEnd;
       const value = e.target.value;
       
-      // Insert tab character
+  
       const newValue = value.substring(0, start) + '  ' + value.substring(end);
       setCode(newValue);
       
-      // Set cursor position
+     
       setTimeout(() => {
         e.target.selectionStart = e.target.selectionEnd = start + 2;
       }, 0);
     }
   };
 
-  // Simple syntax highlighting function
+
   const highlightSyntax = (text, extension) => {
     if (!text) return '';
     
     let highlighted = text;
     
-    // Keywords for different languages
+
     const keywords = {
       js: ['function', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return', 'class', 'constructor', 'import', 'export', 'default'],
       py: ['def', 'class', 'if', 'else', 'elif', 'for', 'while', 'return', 'import', 'from', 'try', 'except', 'with', 'as'],
@@ -238,7 +256,6 @@ export default function MonacoEditor() {
     
     const currentKeywords = keywords[extension] || keywords.js;
     
-    // Apply basic syntax highlighting (this is simplified)
     currentKeywords.forEach(keyword => {
       const regex = new RegExp(`\\b${keyword}\\b`, 'g');
       highlighted = highlighted.replace(regex, `<span class="text-blue-400 font-semibold">${keyword}</span>`);
@@ -291,141 +308,202 @@ export default function MonacoEditor() {
     </svg>
   )
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-red-900">
-      <div className="flex h-screen">
-        {/* Sidebar */}
-        <div className="w-80 bg-slate-800 border-r border-slate-700 flex flex-col">
-          <div className="p-4 border-b border-slate-700">
-            <h2 className="text-lg font-semibold text-white">File Explorer</h2>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto">
-            {fileStructure.folders && fileStructure.folders.length > 0 ? (
+return (
+  <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-red-900">
+    <div className="flex h-screen">
+      {/* Sidebar */}
+      <div className="w-80 bg-slate-800 border-r border-slate-700 flex flex-col">
+        <div className="p-4 border-b border-slate-700">
+          <h2 className="text-lg font-semibold text-white">File Explorer</h2>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {fileStructure ? (
+            fileStructure.folders && fileStructure.folders.length > 0 ? (
               fileStructure.folders.map((folder) => (
                 <div key={folder} className="p-2">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center text-white font-medium">
-                      <span className="mr-2 text-blue-400"><FolderIcon /></span>
+                      <span className="mr-2 text-blue-400">
+                        <FolderIcon />
+                      </span>
                       {folder}
                     </div>
-                    {folder === 'MyProjects' && (
-                      <button
-                        onClick={() => {
-                          setSelectedFolder(folder)
-                          setShowNewFileModal(true)
-                        }}
-                        className="text-slate-400 hover:text-white"
-                      >
-                        <PlusIcon />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedFolder(folder);
+                        setShowNewFileModal(true);
+                      }}
+                      className="text-slate-400 hover:text-white"
+                    >
+                      <PlusIcon />
+                    </button>
                   </div>
                   <div className="ml-4 space-y-1">
-                    {fileStructure.files && fileStructure.files.map((file) => (
-                      <button
-                        key={file}
-                        onClick={() => handleFileSelect(`${folder}/${file}`)}
-                        className={`flex items-center w-full text-left px-2 py-1 rounded text-sm ${
-                          selectedFile === `${folder}/${file}`
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-300 hover:bg-slate-700'
-                        }`}
-                      >
-                        <span className="mr-2"><DocumentIcon /></span>
-                        {file}
-                      </button>
-                    ))}
+                    {fileStructure.files &&
+                      fileStructure.files
+                        .filter((file) => file.startsWith(`${folder}/`))
+                        .map((file) => {
+                          const fileName = file.replace(`${folder}/`, "");
+                          return (
+                            <button
+                              key={file}
+                              onClick={() => handleFileSelect(file)}
+                              className={`flex items-center w-full text-left px-2 py-1 rounded text-sm ${
+                                selectedFile === file
+                                  ? "bg-blue-600 text-white"
+                                  : "text-slate-300 hover:bg-slate-700"
+                              }`}
+                            >
+                              <span className="mr-2">
+                                <DocumentIcon />
+                              </span>
+                              {fileName}
+                            </button>
+                          );
+                        })}
                   </div>
                 </div>
               ))
             ) : (
-              <div className="p-4 text-slate-400 text-center">
-                Loading files...
+              <div className="p-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-white font-medium flex items-center">
+                    <span className="mr-2 text-blue-400">
+                      <FolderIcon />
+                    </span>
+                    Projects
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedFolder("");
+                      setShowNewFileModal(true);
+                    }}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    <PlusIcon />
+                  </button>
+                </div>
+                <div className="ml-4 space-y-1">
+                  {fileStructure.files &&
+                    fileStructure.files.map((file) => (
+                      <button
+                        key={file}
+                        onClick={() => handleFileSelect(file)}
+                        className={`flex items-center w-full text-left px-2 py-1 rounded text-sm ${
+                          selectedFile === file
+                            ? "bg-blue-600 text-white"
+                            : "text-slate-300 hover:bg-slate-700"
+                        }`}
+                      >
+                        <span className="mr-2">
+                          <DocumentIcon />
+                        </span>
+                        {file}
+                      </button>
+                    ))}
+                </div>
               </div>
+            )
+          ) : (
+            <div className="p-4 text-slate-400 text-center">
+              Loading files...
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Editor */}
+      <div className="flex-1 flex flex-col">
+        {/* Toolbar */}
+        <div className="bg-slate-800 border-b border-slate-700 p-3 flex items-center justify-between">
+          <div className="text-white font-medium">
+            {selectedFile || "No file selected"}
+            {selectedFile && (
+              <span className="ml-2 text-xs text-gray-400">
+                {getFileExtension(selectedFile.split("/").pop())}
+              </span>
             )}
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={handleSave}
+              className="flex items-center px-3 py-1 bg-green-600 text-white rounded hover:bg-green-500 transition-colors"
+            >
+              <span className="mr-1">
+                <SaveIcon />
+              </span>
+              Save
+            </button>
+            <button
+              onClick={handleRun}
+              className="flex items-center px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors"
+            >
+              <span className="mr-1">
+                <PlayIcon />
+              </span>
+              Test Bot
+            </button>
+            <button
+              onClick={uploadFile}
+              className="flex items-center px-3 py-1 bg-red-600 text-white rounded hover:bg-red-500 transition-colors"
+            >
+              <span className="mr-1">
+                <UploadIcon />
+              </span>
+              Load Code
+            </button>
           </div>
         </div>
 
-        {/* Main Editor */}
-        <div className="flex-1 flex flex-col">
-          {/* Toolbar */}
-          <div className="bg-slate-800 border-b border-slate-700 p-3 flex items-center justify-between">
-            <div className="text-white font-medium">
-              {selectedFile || 'No file selected'}
-              {selectedFile && (
-                <span className="ml-2 text-xs text-gray-400">
-                  {getFileExtension(selectedFile.split('/').pop())}
-                </span>
-              )}
+        {/* Editor Area */}
+        <div className="flex-1 bg-gray-900 relative">
+          <div className="absolute inset-0 flex">
+            {/* Line numbers */}
+            <div className="bg-gray-800 text-gray-500 text-xs p-4 border-r border-gray-700 select-none">
+              {code.split("\n").map((_, index) => (
+                <div
+                  key={index}
+                  className="leading-6 text-right pr-2"
+                  style={{ minWidth: "30px" }}
+                >
+                  {index + 1}
+                </div>
+              ))}
             </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={handleSave}
-                className="flex items-center px-3 py-1 bg-green-600 text-white rounded hover:bg-green-500 transition-colors"
-              >
-                <span className="mr-1"><SaveIcon /></span>
-                Save
-              </button>
-              <button
-                onClick={handleRun}
-                className="flex items-center px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors"
-              >
-                <span className="mr-1"><PlayIcon /></span>
-                Test Bot
-              </button>
-              <button
-                onClick={uploadFile}
-                className="flex items-center px-3 py-1 bg-red-600 text-white rounded hover:bg-red-500 transition-colors"
-              >
-                <span className="mr-1"><UploadIcon /></span>
-                Load Code 
-              </button>
-            </div>
-          </div>
 
-          {/* Editor Area */}
-          <div className="flex-1 bg-gray-900 relative">
-            <div className="absolute inset-0 flex">
-              {/* Line numbers */}
-              <div className="bg-gray-800 text-gray-500 text-xs p-4 border-r border-gray-700 select-none">
-                {code.split('\n').map((_, index) => (
-                  <div key={index} className="leading-6 text-right pr-2" style={{minWidth: '30px'}}>
-                    {index + 1}
-                  </div>
-                ))}
-              </div>
-              
-              {/* Code editor */}
-              <div className="flex-1 relative">
-                <textarea
-                  ref={textareaRef}
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="w-full h-full bg-transparent text-green-400 font-mono text-sm p-4 border-none outline-none resize-none absolute inset-0 z-10"
-                  style={{
-                    fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-                    tabSize: 2,
-                    lineHeight: '1.5',
-                    color: 'transparent',
-                    caretColor: '#4ade80'
-                  }}
-                  spellCheck={false}
-                />
-                
-                {/* Syntax highlighting overlay */}
-                <div 
-                  className="w-full h-full font-mono text-sm p-4 pointer-events-none absolute inset-0 z-0 overflow-hidden whitespace-pre-wrap break-words"
-                  style={{
-                    fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-                    lineHeight: '1.5'
-                  }}
-                  dangerouslySetInnerHTML={{
-                    __html: highlightSyntax(code, getFileExtension(selectedFile?.split('/').pop()))
-                  }}
-                />
-              </div>
+            {/* Code editor */}
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaRef}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-full h-full bg-transparent text-green-400 font-mono text-sm p-4 border-none outline-none resize-none absolute inset-0 z-10"
+                style={{
+                  fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                  tabSize: 2,
+                  lineHeight: "1.5",
+                  color: "transparent",
+                  caretColor: "#4ade80",
+                }}
+                spellCheck={false}
+              />
+
+              {/* Syntax highlighting overlay */}
+              <div
+                className="w-full h-full font-mono text-sm p-4 pointer-events-none absolute inset-0 z-0 overflow-hidden whitespace-pre-wrap break-words"
+                style={{
+                  fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                  lineHeight: "1.5",
+                }}
+                dangerouslySetInnerHTML={{
+                  __html: highlightSyntax(
+                    code,
+                    getFileExtension(selectedFile?.split("/").pop())
+                  ),
+                }}
+              />
             </div>
           </div>
         </div>
@@ -435,14 +513,16 @@ export default function MonacoEditor() {
       {showNewFileModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 w-96">
-            <h3 className="text-lg font-semibold text-white mb-4">Create New File</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">
+              Create New File
+            </h3>
             <input
               type="text"
               value={newFileName}
               onChange={(e) => setNewFileName(e.target.value)}
               placeholder="filename.js"
               className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-2 text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              onKeyPress={(e) => e.key === 'Enter' && createNewFile()}
+              onKeyPress={(e) => e.key === "Enter" && createNewFile()}
             />
             <div className="flex justify-end space-x-3 mt-4">
               <button
@@ -462,5 +542,6 @@ export default function MonacoEditor() {
         </div>
       )}
     </div>
-  )
+  </div>
+);
 }

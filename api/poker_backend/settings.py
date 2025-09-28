@@ -27,9 +27,20 @@ INSTALLED_APPS = [
     'dev',
     'team',
     'leaderboard',
+
+    'storages',
+
 ]
 
+AWS_S3_ADDRESSING_STYLE = "path"
+AWS_S3_ENDPOINT_URL = "http://localhost:9000"
+AWS_ACCESS_KEY_ID = "minioadmin"
+AWS_SECRET_ACCESS_KEY = "minioadmin"
+AWS_STORAGE_BUCKET_NAME = "files"
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+
 MIDDLEWARE = [
+
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
