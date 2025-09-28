@@ -6,20 +6,20 @@ export default function Leaderboard() {
 
   const leaderboardData = {
     overall: [
-      { rank: 1, name: "Sarah Chen", university: "Stanford", type: "bot", winRate: 68.5, games: 2847, earnings: 145000, avatar: "🤖" },
-      { rank: 2, name: "Mike Johnson", university: "MIT", type: "human", winRate: 64.2, games: 1923, earnings: 98500, avatar: "👨" },
-      { rank: 3, name: "AI_Master_2024", university: "Caltech", type: "bot", winRate: 62.8, games: 3241, earnings: 87300, avatar: "🤖" },
-      { rank: 4, name: "Emma Wilson", university: "Berkeley", type: "human", winRate: 61.4, games: 1456, earnings: 76200, avatar: "👩" },
-      { rank: 5, name: "PokerBot_v3", university: "CMU", type: "bot", winRate: 59.7, games: 2156, earnings: 65400, avatar: "🤖" },
+      { rank: 1, name: "Sarah Chen", university: "Stanford", type: "bot", winRate: 68.5, games: 2847, earnings: 145000 },
+      { rank: 2, name: "Mike Johnson", university: "MIT", type: "human", winRate: 64.2, games: 1923, earnings: 98500 },
+      { rank: 3, name: "AI_Master_2024", university: "Caltech", type: "bot", winRate: 62.8, games: 3241, earnings: 87300 },
+      { rank: 4, name: "Emma Wilson", university: "Berkeley", type: "human", winRate: 61.4, games: 1456, earnings: 76200 },
+      { rank: 5, name: "PokerBot_v3", university: "CMU", type: "bot", winRate: 59.7, games: 2156, earnings: 65400},
     ],
     bots: [
-      { rank: 1, name: "Sarah Chen", university: "Stanford", type: "bot", winRate: 68.5, games: 2847, earnings: 145000, avatar: "🤖" },
-      { rank: 2, name: "AI_Master_2024", university: "Caltech", type: "bot", winRate: 62.8, games: 3241, earnings: 87300, avatar: "🤖" },
-      { rank: 3, name: "PokerBot_v3", university: "CMU", type: "bot", winRate: 59.7, games: 2156, earnings: 65400, avatar: "🤖" },
+      { rank: 1, name: "Sarah Chen", university: "Stanford", type: "bot", winRate: 68.5, games: 2847, earnings: 145000},
+      { rank: 2, name: "AI_Master_2024", university: "Caltech", type: "bot", winRate: 62.8, games: 3241, earnings: 87300 },
+      { rank: 3, name: "PokerBot_v3", university: "CMU", type: "bot", winRate: 59.7, games: 2156, earnings: 65400 },
     ],
     humans: [
-      { rank: 1, name: "Mike Johnson", university: "MIT", type: "human", winRate: 64.2, games: 1923, earnings: 98500, avatar: "👨" },
-      { rank: 2, name: "Emma Wilson", university: "Berkeley", type: "human", winRate: 61.4, games: 1456, earnings: 76200, avatar: "👩" },
+      { rank: 1, name: "Mike Johnson", university: "MIT", type: "human", winRate: 64.2, games: 1923, earnings: 98500},
+      { rank: 2, name: "Emma Wilson", university: "Berkeley", type: "human", winRate: 61.4, games: 1456, earnings: 76200},
     ]
   }
 
