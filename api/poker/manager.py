@@ -587,6 +587,20 @@ class PokerGameManager:
         
         return current_bet, call_amount
 
+    def _get_hand_starting_stacks(self):
+        """Get hand starting stacks from session or calculate from current state"""
+        # First try to get from session (preferred method)
+        if hasattr(self.session, 'hand_starting_player_stack') and hasattr(self.session, 'hand_starting_bot_stack'):
+            return [self.session.hand_starting_player_stack, self.session.hand_starting_bot_stack]
+        
+        # Fallback: try to get from instance variables if available
+        if hasattr(self, 'hand_starting_player_stack') and hasattr(self, 'hand_starting_bot_stack'):
+            return [self.hand_starting_player_stack, self.hand_starting_bot_stack]
+        
+        # Final fallback: use the starting stack constant (this may not be accurate for mid-game)
+        logger.warning("Hand starting stacks not found, using STARTING_STACK as fallback")
+        return [self.settings.STARTING_STACK, self.settings.STARTING_STACK]
+
     def start_new_hand(self, continue_session=False):
         """Initialize a new hand of poker"""
         logger.info(f"Starting new hand. Continue session: {continue_session}")
@@ -622,8 +636,15 @@ class PokerGameManager:
             starting_player_stack = self.settings.STARTING_STACK
             starting_bot_stack = self.settings.STARTING_STACK
             button = 0  # Player starts as dealer
+
+        # Store the starting stacks for this hand (before blinds) for pot calculations
+        # FIXED: Store in session so they persist across requests
+        self.session.hand_starting_player_stack = starting_player_stack
+        self.session.hand_starting_bot_stack = starting_bot_stack
+        self.hand_starting_player_stack = starting_player_stack
+        self.hand_starting_bot_stack = starting_bot_stack
             
-        logger.info(f"Starting stacks - Player: {starting_player_stack}, Bot: {starting_bot_stack}")
+        logger.info(f"Hand starting stacks - Player: {starting_player_stack}, Bot: {starting_bot_stack}")
         logger.info(f"Button position: {button}")
         
         # Initialize blinds based on button position
@@ -1014,23 +1035,26 @@ class PokerGameManager:
             if is_showdown:
                 return "Showdown! Cards revealed."
             else:
+                # Calculate the pot that was won
+                pot_won = abs(round_state.deltas[0]) if round_state.deltas[0] != 0 else abs(round_state.deltas[1])
+                
                 if self.is_bot_vs_bot:
                     # Messages for bot vs bot mode
                     player_bot_name = getattr(self.session.player_bot, 'name', 'Player bot')
                     opponent_bot_name = getattr(self.session.opponent_bot, 'name', 'Opponent bot')
                     
                     if round_state.deltas[0] > 0:
-                        return f"{player_bot_name} wins! Click 'Next Hand' to continue."
+                        return f"{player_bot_name} wins ${pot_won}! Click 'Next Hand' to continue."
                     elif round_state.deltas[0] < 0:
-                        return f"{opponent_bot_name} wins. Click 'Next Hand' to continue."
+                        return f"{opponent_bot_name} wins ${pot_won}. Click 'Next Hand' to continue."
                     else:
                         return f"Split pot! Click 'Next Hand' to continue."
                 else:
                     # Messages for human vs bot mode
                     if round_state.deltas[0] > 0:
-                        return f"You win! Click 'Next Hand' to continue."
+                        return f"You win ${pot_won}! Click 'Next Hand' to continue."
                     elif round_state.deltas[0] < 0:
-                        return f"Bot wins. Click 'Next Hand' to continue."
+                        return f"Bot wins ${pot_won}. Click 'Next Hand' to continue."
                     else:
                         return f"Split pot! Click 'Next Hand' to continue."
         elif bot_action_msg:
@@ -1045,18 +1069,24 @@ class PokerGameManager:
         return "Your turn! Choose your action."
     
     def _update_session_from_round_state(self, round_state):
-        """Update session with current round state"""
+        """Update session with current round state - FIXED"""
         if isinstance(round_state, TerminalState):
-            # Update stacks based on deltas from terminal state
-            starting_stacks = [self.settings.STARTING_STACK, self.settings.STARTING_STACK]
+            # Calculate the pot that was won before updating stacks
+            hand_starting_stacks = self._get_hand_starting_stacks()
+            
+            # Calculate total pot as chips invested during this hand
             if round_state.previous_state:
-                starting_stacks = round_state.previous_state.stacks
+                final_stacks = round_state.previous_state.stacks
+                total_pot = (hand_starting_stacks[0] + hand_starting_stacks[1]) - (final_stacks[0] + final_stacks[1])
+            else:
+                total_pot = abs(round_state.deltas[0]) + abs(round_state.deltas[1])
             
-            self.session.player_stack = starting_stacks[0] + round_state.deltas[0]
-            self.session.bot_stack = starting_stacks[1] + round_state.deltas[1]
+            # Store the pot amount before awarding it
+            self.session.pot = total_pot
             
-            # Pot goes to zero after terminal state
-            self.session.pot = 0
+            # Update stacks based on deltas from terminal state
+            self.session.player_stack = hand_starting_stacks[0] + round_state.deltas[0]
+            self.session.bot_stack = hand_starting_stacks[1] + round_state.deltas[1]
             
             if round_state.previous_state and round_state.previous_state.street > 0:
                 street = round_state.previous_state.street
@@ -1067,9 +1097,10 @@ class PokerGameManager:
             self.session.player_stack = round_state.stacks[0]
             self.session.bot_stack = round_state.stacks[1]
             
-            # Calculate pot as total chips invested by both players
-            total_invested = (self.settings.STARTING_STACK * 2) - sum(round_state.stacks)
-            self.session.pot = total_invested
+            # Calculate pot correctly based on how much each player has put in this hand
+            hand_starting_stacks = self._get_hand_starting_stacks()
+            total_put_in = (hand_starting_stacks[0] + hand_starting_stacks[1]) - (round_state.stacks[0] + round_state.stacks[1])
+            self.session.pot = total_put_in
             
             if round_state.street > 0:
                 visible_cards = round_state.deck[:round_state.street]
