@@ -514,27 +514,6 @@ def save_file_to_storage(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def run_code(request):
-    """Run user code in a sandbox environment"""
-    try:
-        data = request.data
-        code_content = data.get('content', '')
-        
-        # This is a placeholder for code execution
-        # In a real implementation, you'd want to run this in a secure sandbox
-        
-        return JsonResponse({
-            'output': 'Code execution not implemented yet',
-            'errors': []
-        })
-        
-    except Exception as e:
-        logger.error(f"Error running code: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
-
 @require_GET
 def get_skeleton_files(request):
     """Get list of skeleton files for development"""
@@ -763,20 +742,6 @@ import subprocess
 import tempfile
 import os
 import json
-import signal
-from contextlib import contextmanager
-
-@contextmanager
-def timeout(duration):
-    def timeout_handler(signum, frame):
-        raise TimeoutError("Code execution timed out")
-    
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(duration)
-    try:
-        yield
-    finally:
-        signal.alarm(0)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -821,14 +786,13 @@ except Exception as e:
             temp_file = f.name
         
         try:
-            with timeout(5):  # 5 second timeout
-                result = subprocess.run(
-                    ['python3', temp_file],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    cwd=tempfile.gettempdir()
-                )
+            result = subprocess.run(
+                ['python3', temp_file],
+                capture_output=True,
+                text=True,
+                timeout=5,  # 5 second timeout
+                cwd=tempfile.gettempdir()
+            )
             
             output = result.stdout
             error = result.stderr if result.stderr else None
@@ -838,7 +802,7 @@ except Exception as e:
                 'error': error
             })
             
-        except (subprocess.TimeoutExpired, TimeoutError):
+        except subprocess.TimeoutExpired:
             return JsonResponse({
                 'output': '',
                 'error': 'Command timed out'
@@ -884,14 +848,13 @@ except Exception as e:
             temp_file = f.name
         
         try:
-            with timeout(10):  # 10 second timeout for full scripts
-                result = subprocess.run(
-                    ['python3', temp_file],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                    cwd=tempfile.gettempdir()
-                )
+            result = subprocess.run(
+                ['python3', temp_file],
+                capture_output=True,
+                text=True,
+                timeout=10,  # 10 second timeout for full scripts
+                cwd=tempfile.gettempdir()
+            )
             
             output = result.stdout
             errors = [result.stderr] if result.stderr else []
@@ -901,7 +864,7 @@ except Exception as e:
                 'errors': errors
             })
             
-        except (subprocess.TimeoutExpired, TimeoutError):
+        except subprocess.TimeoutExpired:
             return JsonResponse({
                 'output': '',
                 'errors': ['Code execution timed out']
