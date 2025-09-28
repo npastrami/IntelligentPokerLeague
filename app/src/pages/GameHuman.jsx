@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
 import { PlayIcon, XMarkIcon, DocumentIcon } from '@heroicons/react/24/outline'
 import PlayerSeat from '../components/PlayerSeat'
+import CommunityCards from '../components/CommunityCards'
 
 export default function GameHuman({ sessionId }) {
   const [gameState, setGameState] = useState(null)
