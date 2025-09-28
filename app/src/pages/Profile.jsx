@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { EyeIcon, EyeSlashIcon, LinkIcon } from '@heroicons/react/24/outline'
+import { useEffect, useState } from 'react'
+import { EyeIcon, EyeSlashIcon, LinkIcon, ArrowDownTrayIcon, PlusIcon } from '@heroicons/react/24/outline'
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState('profile')
   const [showPassword, setShowPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
-  
+  const [userBots, setUserBots] = useState([])
+
   const [profileData, setProfileData] = useState({
     username: 'john_smith',
     email: 'john@mit.edu',
@@ -55,8 +56,31 @@ export default function Profile() {
     // TODO: Save to backend
   }
 
+    const fetchUserBots = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/poker/get-user-bots/', {
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setUserBots(data.bots)
+      }
+    } catch (error) {
+      console.error('Error fetching user bots:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchUserBots();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-red-900 py-8">
+    <div className="min-h-screen bg-[#19191E] py-8">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
           <div className="bg-blue-600 rounded-full w-20 h-20 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
@@ -97,7 +121,8 @@ export default function Profile() {
               {[
                 { key: 'profile', name: 'Profile' },
                 { key: 'security', name: 'Security' },
-                { key: 'social', name: 'Social Links' }
+                { key: 'social', name: 'Social Links' },
+                { key: 'bots', name: 'My Bots' }
               ].map(({ key, name }) => (
                 <button
                   key={key}
@@ -194,7 +219,7 @@ export default function Profile() {
 
               <button
                 type="submit"
-                className="w-full rounded-md bg-gradient-to-r from-red-600 to-blue-600 px-4 py-2 text-sm font-medium text-white hover:from-red-500 hover:to-blue-500"
+                className="w-full rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-white hover:from-red-500 hover:to-blue-500"
               >
                 Save Profile
               </button>
@@ -265,7 +290,7 @@ export default function Profile() {
 
               <button
                 type="submit"
-                className="w-full rounded-md bg-gradient-to-r from-red-600 to-blue-600 px-4 py-2 text-sm font-medium text-white hover:from-red-500 hover:to-blue-500"
+                className="w-full rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-white hover:from-red-500 hover:to-blue-500"
               >
                 Change Password
               </button>
@@ -322,13 +347,43 @@ export default function Profile() {
 
               <button
                 type="submit"
-                className="w-full rounded-md bg-gradient-to-r from-red-600 to-blue-600 px-4 py-2 text-sm font-medium text-white hover:from-red-500 hover:to-blue-500"
+                className="w-full rounded-md bg-[#ff3131] px-4 py-2 text-sm font-medium text-white"
               >
                 Save Links
               </button>
             </form>
           </div>
         )}
+      {/* My Bots */}
+      {activeTab === "bots" && (
+        <div className="p-6">
+          {/* Bots grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Add Bot card */}
+            <div className="flex items-center justify-center bg-gray-700 rounded-2xl shadow-md p-5 hover:shadow-lg hover:bg-gray-600 transition cursor-pointer">
+              <PlusIcon className="w-10 h-10 text-white" />
+            </div>
+
+            {userBots.map((bot, index) => (
+              <div
+                key={index}
+                className="relative bg-gray-800 rounded-2xl shadow-md p-5 flex flex-col justify-between hover:shadow-lg transition"
+              >
+                {/* Download icon button in top-right */}
+                <button className="absolute top-3 right-3 p-2 rounded-lg hover:bg-gray-700 transition">
+                  <ArrowDownTrayIcon className="w-6 h-6 text-white" />
+                </button>
+
+                {/* Bot Info */}
+                <div>
+                  <h2 className="text-xl font-semibold text-white">{bot.name}</h2>
+                  <p className="text-white mt-2">{bot.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       </div>
     </div>
   )
